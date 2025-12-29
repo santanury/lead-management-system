@@ -15,15 +15,22 @@ import { Badge } from "@/components/ui/badge";
 import { SimpleBarChart } from "@/components/charts/bar-chart";
 import { api, DashboardStats, Lead } from "@/lib/api";
 
+import { LeadDetailsDialog } from "@/components/lead-details-dialog";
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     total_leads: 0,
     qualified_leads: 0,
     avg_score: 0,
     new_leads_today: 0,
+    leads_by_category: [],
   });
   const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Dialog state
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,10 +99,10 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4">
           <CardHeader>
-            <CardTitle>Lead Conversion Rate</CardTitle>
+            <CardTitle>Leads by Category</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <SimpleBarChart />
+            <SimpleBarChart data={stats.leads_by_category} />
           </CardContent>
         </Card>
         <Card className="col-span-3">
@@ -113,7 +120,14 @@ export default function DashboardPage() {
               </TableHeader>
               <TableBody>
                 {recentLeads.map((lead) => (
-                  <TableRow key={lead.id}>
+                  <TableRow
+                    key={lead.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      setSelectedLead(lead);
+                      setDetailsOpen(true);
+                    }}
+                  >
                     <TableCell>
                       <div className="font-medium">
                         {lead.first_name} {lead.last_name}
@@ -143,6 +157,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <LeadDetailsDialog
+        lead={selectedLead}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
     </div>
   );
 }

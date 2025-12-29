@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
 from typing import List
+from datetime import datetime
 from app.models.lead import LeadInput, AnalyzedLead, Lead, BANTAnalysis, EnrichmentData, LeadScore, RoutingDecision
 from app.services.enrichment import enrichment_service
 from app.services.ai_scoring import ai_scoring_service
@@ -23,15 +24,31 @@ async def get_stats(session: Session = Depends(get_session)):
     qualified = len([l for l in leads if l.category == "Hot"])
     avg_score = sum([l.score for l in leads]) / total if total > 0 else 0
     
-    # Simple calculation for "New Leads Today" (mock logic for now since we don't have created_at timestamp yet)
-    # real implementation would filter by date.
-    new_today = len(leads) 
+    # Real "New Leads Today" calculation
+    today = datetime.utcnow().date()
+    new_today = len([l for l in leads if l.created_at and l.created_at.date() == today]) 
+
+    # Chart data: Leads by Category
+    categories = {"Hot": 0, "Warm": 0, "Cold": 0}
+    for l in leads:
+        if l.category in categories:
+            categories[l.category] += 1
+        else:
+            # Handle standard "Warm" or others if logic changes
+            categories["Warm"] += 1
+
+    chart_data = [
+        {"name": "Hot", "leads": categories["Hot"]},
+        {"name": "Warm", "leads": categories["Warm"]},
+        {"name": "Cold", "leads": categories["Cold"]},
+    ]
 
     return {
         "total_leads": total,
         "qualified_leads": qualified,
         "avg_score": round(avg_score, 1),
-        "new_leads_today": new_today
+        "new_leads_today": new_today,
+        "leads_by_category": chart_data
     }
 
 @router.get("/", response_model=List[Lead])

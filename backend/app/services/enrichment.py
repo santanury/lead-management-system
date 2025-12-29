@@ -1,10 +1,11 @@
 from app.models.lead import EnrichmentData
+from app.utils.gemini_client import gemini_client
+import json
 
 class EnrichmentService:
     """
     A modular service for enriching lead data.
-    In a real-world application, this service would integrate with third-party
-    APIs like Clearbit, Hunter.io, or internal databases.
+    Uses Gemini to "hallucinate" (retrieve knowledge of) company details.
     """
 
     def enrich_lead(self, company_name: str, email: str) -> EnrichmentData:
@@ -22,8 +23,6 @@ class EnrichmentService:
     def _validate_email(self, email: str) -> bool:
         """
         Simulates email validation.
-        Placeholder: For the hackathon, we'll assume most emails are valid.
-        A real implementation would use a service like NeverBounce or ZeroBounce.
         """
         if "invalid" in email:
             return False
@@ -31,30 +30,38 @@ class EnrichmentService:
 
     def _enrich_company_info(self, company_name: str) -> dict:
         """
-        Simulates company data enrichment.
-        Placeholder: Returns mock data based on the company name.
-        A real implementation would use a service like Clearbit or ZoomInfo.
+        Uses Gemini to get company details.
         """
-        # Mock data for demonstration purposes
-        if "big corp" in company_name.lower():
+        # Fetch status of search enrichment from settings potentially, but forcing for now as per user request
+        
+        prompt = f"""
+        You are a data enrichment bot with access to Google Search.
+        Use Google Search to find the latest information about the company "{company_name}".
+        
+        Provide a JSON object with:
+        - company_name (official name)
+        - industry
+        - size (approx employees)
+        - website (url)
+        
+        Return ONLY valid JSON.
+        """
+        
+        try:
+            print(f"🔍 [EnrichmentService] Searching Google for: {company_name}")
+            # Use JSON response method with search enabled
+            result = gemini_client.generate_json_response(prompt, use_search=True)
+            print(f"✅ [EnrichmentService] Search Result: {result}")
+            return result
+        except Exception as e:
+            print(f"❌ [EnrichmentService] Enrichment failed: {e}")
+        except Exception as e:
+            print(f"Enrichment failed: {e}")
             return {
-                "company_name": "Big Corp Inc.",
-                "industry": "Technology",
-                "size": "10,001+ employees",
-                "website": "www.bigcorp.com",
+                "company_name": company_name,
+                "industry": "Unknown",
+                "size": "Unknown",
+                "website": "Unknown",
             }
-        elif "startup" in company_name.lower():
-            return {
-                "company_name": "Startup LLC",
-                "industry": "Software",
-                "size": "11-50 employees",
-                "website": "www.startup.io",
-            }
-        return {
-            "company_name": company_name,
-            "industry": "Unknown",
-            "size": "Unknown",
-            "website": "Unknown",
-        }
 
 enrichment_service = EnrichmentService()

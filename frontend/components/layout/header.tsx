@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { MobileSidebar } from "./mobile-sidebar";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export function Header() {
   return (
@@ -29,9 +30,8 @@ export function Header() {
           <MobileSidebar />
         </SheetContent>
       </Sheet>
-      <div className="w-full flex-1">
-        {/* Can add search bar here later */}
-      </div>
+      <div className="w-full flex-1">{/* Can add search bar here later */}</div>
+      <ModeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" size="icon" className="rounded-full">
@@ -42,7 +42,9 @@ export function Header() {
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/settings">Settings</Link>
+          </DropdownMenuItem>
           <DropdownMenuItem>Support</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem>Logout</DropdownMenuItem>

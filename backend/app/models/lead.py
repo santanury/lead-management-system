@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Session
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict
+from datetime import datetime
 from sqlalchemy import JSON, Column
 
 # --- API Models (Pydantic/SQLModel without table) ---
@@ -68,3 +69,7 @@ class Lead(SQLModel, table=True):
     # Routing
     queue: str
     routing_reason: str
+
+    # Meta
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+

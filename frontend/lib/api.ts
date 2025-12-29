@@ -61,6 +61,14 @@ export interface Lead {
 
   queue: string;
   routing_reason: string;
+
+  // Enrichment
+  company_info?: {
+    industry?: string;
+    size?: string;
+    website?: string;
+    [key: string]: any;
+  };
 }
 
 const API_BASE_URL = "http://localhost:8000/api/v1";
@@ -70,6 +78,7 @@ export interface DashboardStats {
   qualified_leads: number;
   avg_score: number;
   new_leads_today: number;
+  leads_by_category: { name: string; leads: number }[];
 }
 
 export const api = {

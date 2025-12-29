@@ -25,6 +25,8 @@ import { api, Lead } from "@/lib/api";
 
 const LEADS_PER_PAGE = 10;
 
+import { LeadDetailsDialog } from "@/components/lead-details-dialog";
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,10 @@ export default function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [scoreFilter, setScoreFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Dialog state
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -140,7 +146,14 @@ export default function LeadsPage() {
           </TableHeader>
           <TableBody>
             {paginatedLeads.map((lead) => (
-              <TableRow key={lead.id}>
+              <TableRow
+                key={lead.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => {
+                  setSelectedLead(lead);
+                  setDetailsOpen(true);
+                }}
+              >
                 <TableCell>
                   <div className="font-medium">
                     {lead.first_name} {lead.last_name}
@@ -173,6 +186,12 @@ export default function LeadsPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <LeadDetailsDialog
+        lead={selectedLead}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
       <div className="flex items-center justify-end space-x-2 py-4">
         <Button
           variant="outline"

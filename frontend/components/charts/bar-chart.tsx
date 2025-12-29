@@ -11,16 +11,18 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const data = [
-  { name: "Jan", leads: 400 },
-  { name: "Feb", leads: 300 },
-  { name: "Mar", leads: 600 },
-  { name: "Apr", leads: 800 },
-  { name: "May", leads: 500 },
-  { name: "Jun", leads: 700 },
-];
+interface SimpleBarChartProps {
+  data?: { name: string; leads: number }[];
+}
 
-export function SimpleBarChart() {
+export function SimpleBarChart({ data }: SimpleBarChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+        No data available
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data}>

@@ -9,11 +9,12 @@ class GeminiClient:
         self.model_name = "gemini-2.5-flash"
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    def generate_json_response(self, prompt: str) -> dict:
+    def generate_json_response(self, prompt: str, model_name: str = None, use_search: bool = False) -> dict:
         """
         Generates a JSON response from a prompt using the Gemini REST API.
         """
-        url = f"{self.base_url}/{self.model_name}:generateContent"
+        model = model_name or self.model_name
+        url = f"{self.base_url}/{model}:generateContent"
         params = {"key": self.api_key}
         
         # We verify request structures for Gemini 1.5/pro series
@@ -31,6 +32,10 @@ class GeminiClient:
                 "response_mime_type": "application/json"
             }
         }
+        
+        if use_search:
+            # Add Google Search tool
+            data["tools"] = [{"google_search": {}}]
 
         try:
             response = requests.post(url, params=params, headers=headers, json=data, timeout=30)
@@ -64,5 +69,32 @@ class GeminiClient:
         except Exception as e:
             print(f"Error generating response from Gemini: {e}")
             raise
+
+    def generate_content(self, prompt: str, model_name: str = None) -> str:
+        """
+        Generates a plain text response.
+        """
+        model = model_name or self.model_name
+        url = f"{self.base_url}/{model}:generateContent"
+        params = {"key": self.api_key}
+        headers = {"Content-Type": "application/json"}
+        
+        data = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+        
+        try:
+            response = requests.post(url, params=params, headers=headers, json=data, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+            candidates = result.get("candidates", [])
+            if not candidates:
+                 return ""
+            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+        except Exception as e:
+            print(f"Error generating content: {e}")
+            return ""
 
 gemini_client = GeminiClient()

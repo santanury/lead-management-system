@@ -11,11 +11,22 @@ class AIScoringService:
         """
         Analyzes and scores a lead using the Gemini AI model.
         """
+        # Fetch selected model from DB
+        from app.db.database import get_session
+        from app.models.settings import Settings
+        from sqlmodel import select
+        
+        # Helper to get session since we are in a service
+        # In a larger app, we'd pass session as dependency
+        with next(get_session()) as session:
+            settings_db = session.exec(select(Settings)).first()
+            selected_model = settings_db.selected_model if settings_db else "gemini-2.5-flash"
+
         prompt = self._build_prompt(lead_input)
         
         try:
             # Get the structured JSON response from Gemini
-            ai_response = gemini_client.generate_json_response(prompt)
+            ai_response = gemini_client.generate_json_response(prompt, model_name=selected_model)
             
             # Parse the AI response into our Pydantic models
             bant_analysis = BANTAnalysis(**ai_response.get("bant_analysis", {}))
