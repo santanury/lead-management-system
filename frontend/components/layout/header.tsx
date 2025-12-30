@@ -12,7 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { MobileSidebar } from "./mobile-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 
@@ -26,7 +31,8 @@ export function Header() {
             <span className="sr-only">Toggle navigation menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="flex flex-col">
+        <SheetContent side="left" className="flex flex-col p-6">
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
           <MobileSidebar />
         </SheetContent>
       </Sheet>

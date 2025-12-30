@@ -1,4 +1,4 @@
-from app.models.lead import LeadInput, BANTAnalysis, LeadScore
+from app.models.lead import LeadInput, BANTAnalysis, LeadScore, EnrichmentData
 from app.utils.gemini_client import gemini_client
 import json
 
@@ -7,7 +7,7 @@ class AIScoringService:
     Service for scoring leads using AI (Gemini).
     """
 
-    def score_lead(self, lead_input: LeadInput) -> (BANTAnalysis, LeadScore):
+    def score_lead(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> (BANTAnalysis, LeadScore):
         """
         Analyzes and scores a lead using the Gemini AI model.
         """
@@ -22,7 +22,7 @@ class AIScoringService:
             settings_db = session.exec(select(Settings)).first()
             selected_model = settings_db.selected_model if settings_db else "gemini-2.5-flash"
 
-        prompt = self._build_prompt(lead_input)
+        prompt = self._build_prompt(lead_input, enrichment_data)
         
         try:
             # Get the structured JSON response from Gemini
@@ -51,7 +51,7 @@ class AIScoringService:
             # Fallback to a default/error state if AI fails
             return self._get_fallback_scoring()
 
-    def _build_prompt(self, lead_input: LeadInput) -> str:
+    def _build_prompt(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> str:
         """
         Constructs the prompt for the Gemini API.
         """
@@ -66,10 +66,23 @@ class AIScoringService:
         - Email: {lead_input.email}
         - Notes/Message: "{lead_input.notes}"
 
+        **Enriched Company Data (from Google Search):**
+        - Official Name: {enrichment_data.company_info.get('company_name', 'N/A') if enrichment_data.company_info else 'N/A'}
+        - Industry: {enrichment_data.company_info.get('industry', 'N/A') if enrichment_data.company_info else 'N/A'}
+        - Size: {enrichment_data.company_info.get('size', 'N/A') if enrichment_data.company_info else 'N/A'}
+        - Website: {enrichment_data.company_info.get('website', 'N/A') if enrichment_data.company_info else 'N/A'}
+        
         **Instructions:**
-        1.  **BANT Analysis:** Evaluate each BANT component based on the lead's message. Be critical. If information is missing, state that it's inferred or not available.
-        2.  **Lead Score:** Assign a score from 0 (very low quality) to 100 (perfect fit). A score of 85+ is "Hot", 60-84 is "Warm", and below 60 is "Cold".
-        3.  **Explanation:** Justify your score in one or two sentences.
+        1.  **Verification:** Cross-reference the user's claims with the enriched company data. 
+            - If the user claims to be from a large enterprise but the enriched data shows a small unknown shop, flag this as a risk.
+            - If the email domain aligns with the website, treat it as verified.
+        2.  **BANT Analysis:** Evaluate each BANT component based on the lead's message. Be critical. If information is missing, state that it's inferred or not available.
+        3.  **Lead Score:** Assign a score from 0 (very low quality) to 100 (perfect fit). A score of 85+ is "Hot", 60-84 is "Warm", and below 60 is "Cold".
+        4.  **Explanation:** Justify your score in one or two sentences. Explicitly mention if the company background check (enrichment) positively or negatively influenced the score.
+            - **CRITICAL:** Your explanation MUST be consistent with the score key.
+            - If score < 60, do NOT call it a "warm" lead. Call it "Cold", "Weak", or "High Risk".
+            - If score is 60-84, call it "Warm" or "Promising".
+            - If score is 85+, call it "Hot" or "Excellent".
 
         **Output Format:**
         Return a single JSON object with two keys: "bant_analysis" and "lead_score".

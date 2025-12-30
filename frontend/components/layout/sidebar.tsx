@@ -60,21 +60,6 @@ export function Sidebar() {
             })}
           </nav>
         </div>
-
-        {/* Sidebar Footer area could go here */}
-        <div className="mt-auto p-4 border-t border-sidebar-border">
-          <div className="rounded-lg bg-sidebar-accent p-4">
-            <h4 className="mb-1 text-sm font-semibold text-sidebar-accent-foreground">
-              Need Help?
-            </h4>
-            <p className="text-xs text-muted-foreground mb-3">
-              Check our documentation for AI scoring tips.
-            </p>
-            <Button size="sm" className="w-full" variant="secondary">
-              Documentation
-            </Button>
-          </div>
-        </div>
       </div>
     </div>
   );

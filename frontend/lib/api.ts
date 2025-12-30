@@ -99,4 +99,9 @@ export const api = {
     const response = await axios.post(`${API_BASE_URL}/analyze`, data);
     return response.data;
   },
+
+  // Delete a lead
+  deleteLead: async (id: number): Promise<void> => {
+    await axios.delete(`${API_BASE_URL}/${id}`);
+  },
 };

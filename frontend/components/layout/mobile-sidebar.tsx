@@ -8,6 +8,7 @@ import {
   FileText,
   SlidersHorizontal,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -32,7 +33,7 @@ export function MobileSidebar() {
           key={item.label}
           href={item.href}
           className={cn(
-            "mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground",
+            "flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground",
             {
               "bg-muted text-foreground": pathname === item.href,
             }

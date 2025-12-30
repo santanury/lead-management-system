@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { SimpleBarChart } from "@/components/charts/bar-chart";
+import { LeadPieChart } from "@/components/charts/pie-chart";
 import { api, DashboardStats, Lead } from "@/lib/api";
 
 import { LeadDetailsDialog } from "@/components/lead-details-dialog";
@@ -102,7 +102,7 @@ export default function DashboardPage() {
             <CardTitle>Leads by Category</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <SimpleBarChart data={stats.leads_by_category} />
+            <LeadPieChart data={stats.leads_by_category} />
           </CardContent>
         </Card>
         <Card className="col-span-3">

@@ -13,7 +13,7 @@ class EnrichmentService:
         Enriches lead data with company information and email validation.
         """
         is_valid_email = self._validate_email(email)
-        company_info = self._enrich_company_info(company_name) if is_valid_email else None
+        company_info = self._enrich_company_info(company_name, email) if is_valid_email else None
         
         return EnrichmentData(
             company_info=company_info,
@@ -28,21 +28,24 @@ class EnrichmentService:
             return False
         return True
 
-    def _enrich_company_info(self, company_name: str) -> dict:
+    def _enrich_company_info(self, company_name: str, email: str) -> dict:
         """
         Uses Gemini to get company details.
         """
         # Fetch status of search enrichment from settings potentially, but forcing for now as per user request
         
+        # Extract domain from email if possible for better search
+        domain = email.split('@')[-1] if email and "@" in email else ""
+        
         prompt = f"""
         You are a data enrichment bot with access to Google Search.
-        Use Google Search to find the latest information about the company "{company_name}".
+        Use Google Search to find the latest information about the company "{company_name}" (Domain: {domain}).
         
         Provide a JSON object with:
         - company_name (official name)
-        - industry
-        - size (approx employees)
-        - website (url)
+        - industry (e.g. Technology, Healthcare, Finance)
+        - size (approx employees, e.g. "10-50", "1000+")
+        - website (official URL)
         
         Return ONLY valid JSON.
         """
@@ -55,8 +58,6 @@ class EnrichmentService:
             return result
         except Exception as e:
             print(f"❌ [EnrichmentService] Enrichment failed: {e}")
-        except Exception as e:
-            print(f"Enrichment failed: {e}")
             return {
                 "company_name": company_name,
                 "industry": "Unknown",

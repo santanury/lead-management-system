@@ -19,6 +19,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { ThemeSelector } from "@/components/settings/theme-selector";
 import axios from "axios";
 
 // Using simple axios calls here, could be moved to api.ts
@@ -147,24 +148,5 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-import { useTheme } from "next-themes";
-
-function ThemeSelector() {
-  const { theme, setTheme } = useTheme();
-
-  return (
-    <Select value={theme} onValueChange={setTheme}>
-      <SelectTrigger className="w-[180px]">
-        <SelectValue placeholder="Select theme" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="light">Light</SelectItem>
-        <SelectItem value="dark">Dark</SelectItem>
-        <SelectItem value="system">System</SelectItem>
-      </SelectContent>
-    </Select>
   );
 }

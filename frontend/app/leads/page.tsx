@@ -26,6 +26,7 @@ import { api, Lead } from "@/lib/api";
 const LEADS_PER_PAGE = 10;
 
 import { LeadDetailsDialog } from "@/components/lead-details-dialog";
+import { Trash2 } from "lucide-react";
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -36,8 +37,22 @@ export default function LeadsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   // Dialog state
+  // Dialog state
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation(); // Prevent row click
+    if (!confirm("Are you sure you want to delete this lead?")) return;
+
+    try {
+      await api.deleteLead(id);
+      setLeads((prev) => prev.filter((lead) => lead.id !== id));
+    } catch (error) {
+      console.error("Failed to delete lead:", error);
+      alert("Failed to delete lead");
+    }
+  };
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -133,6 +148,7 @@ export default function LeadsPage() {
           </SelectContent>
         </Select>
       </div>
+
       <Card>
         <Table>
           <TableHeader>
@@ -142,6 +158,7 @@ export default function LeadsPage() {
               <TableHead>Budget</TableHead>
               <TableHead>Score</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -163,7 +180,6 @@ export default function LeadsPage() {
                   </div>
                 </TableCell>
                 <TableCell>{lead.company_name}</TableCell>
-                {/* Budget is text in DB ("$100k"), not necessarily number, so no toLocaleString() */}
                 <TableCell>
                   {lead.budget_analysis.substring(0, 20)}...
                 </TableCell>
@@ -180,6 +196,16 @@ export default function LeadsPage() {
                   >
                     {lead.category}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => handleDelete(e, lead.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

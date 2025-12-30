@@ -38,9 +38,12 @@ export default function LeadSubmissionPage() {
       setResult(data);
       // Optional: redirect to leads page after short delay or show success
       // router.push("/leads");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Analysis failed:", error);
-      alert("Failed to analyze lead. Check backend connection.");
+      const msg =
+        error.response?.data?.detail ||
+        "Failed to analyze lead. Check backend connection.";
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -126,34 +129,36 @@ export default function LeadSubmissionPage() {
 
         {/* Results Section */}
         {result && (
-          <Card className="bg-slate-50 border-green-200">
+          <Card className="bg-slate-50 dark:bg-slate-900 border-green-200 dark:border-green-900">
             <CardHeader>
-              <CardTitle className="text-green-700">Analysis Result</CardTitle>
+              <CardTitle className="text-green-700 dark:text-green-400">
+                Analysis Result
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between items-center bg-white p-4 rounded border">
+              <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded border dark:border-slate-700">
                 <span className="font-semibold text-lg">Score</span>
                 <span className="text-2xl font-bold">
                   {result.lead_score.score}/100
                 </span>
               </div>
 
-              <div className="bg-white p-4 rounded border space-y-2">
-                <div className="font-semibold text-sm text-gray-500">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded border dark:border-slate-700 space-y-2">
+                <div className="font-semibold text-sm text-gray-500 dark:text-gray-400">
                   CATEGORY
                 </div>
                 <div className="font-medium">{result.lead_score.category}</div>
               </div>
 
-              <div className="bg-white p-4 rounded border space-y-2">
-                <div className="font-semibold text-sm text-gray-500">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded border dark:border-slate-700 space-y-2">
+                <div className="font-semibold text-sm text-gray-500 dark:text-gray-400">
                   SUMMARY
                 </div>
                 <p className="text-sm">{result.lead_score.explanation}</p>
               </div>
 
-              <div className="bg-white p-4 rounded border space-y-2">
-                <div className="font-semibold text-sm text-gray-500">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded border dark:border-slate-700 space-y-2">
+                <div className="font-semibold text-sm text-gray-500 dark:text-gray-400">
                   BANT BREAKDOWN
                 </div>
                 <ul className="text-sm space-y-1 list-disc pl-4">

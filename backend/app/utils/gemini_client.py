@@ -1,5 +1,6 @@
 import requests
 import json
+import time
 from app.config import settings
 
 class GeminiClient:
@@ -36,12 +37,53 @@ class GeminiClient:
         if use_search:
             # Add Google Search tool
             data["tools"] = [{"google_search": {}}]
+            # Remove JSON enforcement if search is on, as it can conflict
+            if "generationConfig" in data:
+                del data["generationConfig"]
+        
+        # If we removed config or if it didn't exist, we rely on the prompt instructing for JSON
 
+        # If we removed config or if it didn't exist, we rely on the prompt instructing for JSON
+
+        max_retries = 3
+        backoff = 2
+        
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(url, params=params, headers=headers, json=data, timeout=30)
+                
+                if response.status_code == 429:
+                    if attempt == max_retries - 1:
+                        raise requests.exceptions.HTTPError(f"Gemini API Rate Limit exceeded after {max_retries} retries.")
+                    print(f"⚠️ Gemini Rate Limit. Retrying in {backoff}s...")
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                    
+                response.raise_for_status()
+                
+                result = response.json()
+                # If we get here successfully, break loop
+                break
+            except requests.exceptions.RequestException as e:
+                # Catch 429 if raised as exception, or verify status
+                if getattr(e.response, 'status_code', None) == 429:
+                     print(f"⚠️ Gemini Rate Limit (Exception). Retrying in {backoff}s...")
+                     time.sleep(backoff)
+                     backoff *= 2
+                     continue
+
+                if attempt == max_retries - 1:
+                    print(f"❌ Error communicating with Gemini API after {max_retries} attempts: {e}")
+                    raise e
+                print(f"⚠️ Gemini API Error (Attempt {attempt+1}): {e}. Retrying...")
+                time.sleep(backoff)
+                backoff *= 2
+                
+        # Move parsing logic outside loop, assumes result is set if no exception raised
         try:
-            response = requests.post(url, params=params, headers=headers, json=data, timeout=30)
-            response.raise_for_status()
-            
-            result = response.json()
+            # indent validation logic to match existing code structure if I am keeping it inside try/except block of original
+            # actually I am REPLACING the original try block.
             
             # Extract text from response
             # Structure: candidates[0].content.parts[0].text
