@@ -20,8 +20,16 @@ import {
 } from "@/components/ui/sheet";
 import { MobileSidebar } from "./mobile-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
+import { useRouter } from "next/navigation";
 
 export function Header() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    document.cookie = "token=; path=/; max-age=0; SameSite=Strict";
+    router.push("/login");
+  };
+
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
       <Sheet>
@@ -51,9 +59,8 @@ export function Header() {
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem>Support</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Logout</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

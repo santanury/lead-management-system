@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import leads
+from app.api import leads, auth
 from app.api import settings as settings_router
 from app.config import settings
 # Removed: from dotenv import load_dotenv
@@ -28,6 +28,7 @@ app.add_middleware(
 )
 
 # Include the API router
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(leads.router, prefix="/api/v1", tags=["leads"])
 app.include_router(settings_router.router, prefix="/api/v1", tags=["settings"])
 

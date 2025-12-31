@@ -8,3 +8,6 @@ email-validator
 pydantic-settings
 sqlmodel
 psycopg2-binary
+python-jose[cryptography]
+bcrypt
+python-multipart
