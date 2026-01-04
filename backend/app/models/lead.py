@@ -1,8 +1,33 @@
 from sqlmodel import SQLModel, Field, Session
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict
+from enum import Enum
 from datetime import datetime
 from sqlalchemy import JSON, Column
+
+
+# --- Verification Enums & Models ---
+
+class LeadVerificationStatus(str, Enum):
+    VERIFIED_DECISION_MAKER = "Verified Decision Maker"
+    VERIFIED_EMPLOYEE = "Verified Employee (Non-Decision Maker)"
+    UNVERIFIED = "Unverified / Needs Manual Review"
+    LIKELY_FAKE = "Likely Fake / Impersonation"
+
+class AuthorityTier(str, Enum):
+    TIER_1 = "Tier 1 (CXO/Founder/Partner)"
+    TIER_2 = "Tier 2 (VP/Director/Head)"
+    TIER_3 = "Tier 3 (Manager/Evaluator)"
+    TIER_4 = "Tier 4 (Individual Contributor)"
+    UNKNOWN = "Unknown"
+
+class VerificationResult(BaseModel):
+    status: LeadVerificationStatus
+    score: int = Field(..., ge=0, le=100)
+    authority_tier: AuthorityTier
+    identity_verified: bool
+    employment_verified: bool
+    reason: str
 
 # --- API Models (Pydantic/SQLModel without table) ---
 
@@ -38,6 +63,7 @@ class AnalyzedLead(BaseModel):
     enrichment_data: EnrichmentData
     lead_score: LeadScore
     routing_decision: RoutingDecision
+    verification_result: Optional[VerificationResult] = None
 
 # --- Database Model ---
 
@@ -65,6 +91,14 @@ class Lead(SQLModel, table=True):
     score: int
     category: str
     explanation: str
+
+    # Verification
+    verification_status: Optional[str] = Field(default=LeadVerificationStatus.UNVERIFIED.value)
+    verification_score: int = Field(default=0)
+    authority_tier: Optional[str] = Field(default=AuthorityTier.UNKNOWN.value)
+    identity_verified: bool = Field(default=False)
+    employment_verified: bool = Field(default=False)
+    verification_reason: Optional[str] = Field(default=None)
 
     # Routing
     queue: str

@@ -6,6 +6,7 @@ from app.models.lead import LeadInput, AnalyzedLead, Lead, BANTAnalysis, Enrichm
 from app.services.enrichment import enrichment_service
 from app.services.ai_scoring import ai_scoring_service
 from app.services.routing import routing_service
+from app.services.verification import verification_service
 from app.db.database import get_session
 
 from sqlmodel import Session, select
@@ -83,13 +84,16 @@ async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_ses
         if not enrichment_data.email_valid:
             raise HTTPException(status_code=400, detail="Invalid email address provided.")
 
-        # 2. Score the lead using AI
-        bant_analysis, lead_score = ai_scoring_service.score_lead(lead_input, enrichment_data)
+        # 2. Verify Lead (Agentic Verification)
+        verification_result = verification_service.verify_lead(lead_input, enrichment_data)
 
-        # 3. Determine routing
+        # 3. Score the lead using AI (now aware of verification)
+        bant_analysis, lead_score = ai_scoring_service.score_lead(lead_input, enrichment_data, verification_result)
+
+        # 4. Determine routing
         routing_decision = routing_service.route_lead(lead_score)
         
-        # 4. Save to Database
+        # 5. Save to Database
         db_lead = Lead(
             first_name=lead_input.first_name,
             last_name=lead_input.last_name,
@@ -105,6 +109,13 @@ async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_ses
             score=lead_score.score,
             category=lead_score.category,
             explanation=lead_score.explanation,
+            # New Verification Fields
+            verification_status=verification_result.status.value,
+            verification_score=verification_result.score,
+            authority_tier=verification_result.authority_tier.value,
+            identity_verified=verification_result.identity_verified,
+            employment_verified=verification_result.employment_verified,
+            verification_reason=verification_result.reason,
             queue=routing_decision.queue,
             routing_reason=routing_decision.reason
         )
@@ -118,7 +129,8 @@ async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_ses
             bant_analysis=bant_analysis,
             enrichment_data=enrichment_data,
             lead_score=lead_score,
-            routing_decision=routing_decision
+            routing_decision=routing_decision,
+            verification_result=verification_result
         )
         
         return analyzed_lead

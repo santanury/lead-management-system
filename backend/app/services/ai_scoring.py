@@ -1,4 +1,4 @@
-from app.models.lead import LeadInput, BANTAnalysis, LeadScore, EnrichmentData
+from app.models.lead import LeadInput, BANTAnalysis, LeadScore, EnrichmentData, VerificationResult, LeadVerificationStatus
 from app.utils.gemini_client import gemini_client
 import json
 
@@ -7,7 +7,7 @@ class AIScoringService:
     Service for scoring leads using AI (Gemini).
     """
 
-    def score_lead(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> (BANTAnalysis, LeadScore):
+    def score_lead(self, lead_input: LeadInput, enrichment_data: EnrichmentData, verification_result: VerificationResult) -> (BANTAnalysis, LeadScore):
         """
         Analyzes and scores a lead using the Gemini AI model.
         """
@@ -22,7 +22,7 @@ class AIScoringService:
             settings_db = session.exec(select(Settings)).first()
             selected_model = settings_db.selected_model if settings_db else "gemini-2.5-flash"
 
-        prompt = self._build_prompt(lead_input, enrichment_data)
+        prompt = self._build_prompt(lead_input, enrichment_data, verification_result)
         
         try:
             # Get the structured JSON response from Gemini
@@ -36,7 +36,7 @@ class AIScoringService:
             
             # Here you can add deterministic logic to adjust the score.
             # For now, we'll primarily use the AI's judgment.
-            final_score = self._calculate_final_score(ai_score_details.get("score", 0), lead_input)
+            final_score = self._calculate_final_score(ai_score_details.get("score", 0), lead_input, verification_result)
             
             lead_score = LeadScore(
                 score=final_score,
@@ -51,7 +51,7 @@ class AIScoringService:
             # Fallback to a default/error state if AI fails
             return self._get_fallback_scoring()
 
-    def _build_prompt(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> str:
+    def _build_prompt(self, lead_input: LeadInput, enrichment_data: EnrichmentData, verification_result: VerificationResult) -> str:
         """
         Constructs the prompt for the Gemini API.
         """
@@ -66,6 +66,12 @@ class AIScoringService:
         - Email: {lead_input.email}
         - Notes/Message: "{lead_input.notes}"
 
+        **Verification & Authority Check (Pre-Computed):**
+        - Status: {verification_result.status.value}
+        - Verified Score: {verification_result.score}/100
+        - Authority Tier: {verification_result.authority_tier.value}
+        - Reason: {verification_result.reason}
+
         **Enriched Company Data (from Google Search):**
         - Official Name: {enrichment_data.company_info.get('company_name', 'N/A') if enrichment_data.company_info else 'N/A'}
         - Industry: {enrichment_data.company_info.get('industry', 'N/A') if enrichment_data.company_info else 'N/A'}
@@ -78,7 +84,10 @@ class AIScoringService:
             - If the email domain aligns with the website, treat it as verified.
         2.  **BANT Analysis:** Evaluate each BANT component based on the lead's message. Be critical. If information is missing, state that it's inferred or not available.
         3.  **Lead Score:** Assign a score from 0 (very low quality) to 100 (perfect fit). A score of 85+ is "Hot", 60-84 is "Warm", and below 60 is "Cold".
-        4.  **Explanation:** Justify your score in one or two sentences. Explicitly mention if the company background check (enrichment) positively or negatively influenced the score.
+        4.  **High-Stakes Risk Guardrail:**
+            - **Rule**: If the inferred Budget is HIGH (e.g., > $50,000) BUT the Verification Status is "Unverified" or "Likely Fake", you MUST penalize the score.
+            - A high-budget claim from an unknown/unverified entity is suspect. CAP the score at 50 ("Cold") and mark explanation as "High Risk / Manual Review Needed".
+        5.  **Explanation:** Justify your score in one or two sentences. Explicitly mention if the company background check (enrichment) positively or negatively influenced the score.
             - **CRITICAL:** Your explanation MUST be consistent with the score key.
             - If score < 60, do NOT call it a "warm" lead. Call it "Cold", "Weak", or "High Risk".
             - If score is 60-84, call it "Warm" or "Promising".
@@ -93,12 +102,23 @@ class AIScoringService:
         Example of a bad lead: "Just looking for info."
         """
 
-    def _calculate_final_score(self, ai_score: int, lead_input: LeadInput) -> int:
+    def _calculate_final_score(self, ai_score: int, lead_input: LeadInput, verification_result: VerificationResult) -> int:
         """
         Applies deterministic adjustments to the AI-generated score.
         For example, boost score for known strategic companies.
         """
+        # CRITICAL: If flagged as Likely Fake, kill the score.
+        if verification_result.status == LeadVerificationStatus.LIKELY_FAKE:
+            return 0
+
         score = ai_score
+        
+        # Boost for Verified Decision Maker
+        if verification_result.status == LeadVerificationStatus.VERIFIED_DECISION_MAKER:
+            score += 15
+        elif verification_result.status == LeadVerificationStatus.VERIFIED_EMPLOYEE:
+            score += 5
+            
         if "big corp" in lead_input.company_name.lower():
             score += 5  # Add a small boost for enterprise leads
         
