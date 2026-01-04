@@ -1,8 +1,12 @@
 import google.generativeai as genai
 import os
 
-# Directly use the key you provided to bypass env loading issues
-API_KEY = "AIzaSyDU1Y2UI23HsRUky3KYrQFerpCSbXPWN-8"
+from dotenv import load_dotenv
+
+# Load env variables
+load_dotenv()
+
+API_KEY = os.getenv("GOOGLE_API_KEY")
 
 def test_gemini_key():
     print(f"Testing API Key: {API_KEY[:10]}...")
