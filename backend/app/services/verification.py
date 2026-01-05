@@ -86,13 +86,13 @@ class VerificationService:
             - If email uses a weird variation (e.g. `soumya17@` vs `soumya.chaki@`) -> Downgrade confidence.
 
         **Output Logic:**
-        - **Verified Decision Maker**: Identity confirmed + Employment confirmed + Tier 1 or 2 + Standard Email Pattern.
+        - **Verified Decision Maker**: Identity confirmed + Employment confirmed + Tier 1 or 2. (Email Pattern Match is preferred but NOT required for small companies).
         - **Verified Employee**: Identity confirmed + Employment confirmed + Tier 3 or 4.
         - **Likely Fake**: 
             - Claimed role contradicts public data (e.g. LinkedIn says they are a student or work elsewhere).
             - Famous name (e.g. Satya Nadella) with non-corporate email.
             - Non-existent person at a major company.
-            - **Email Pattern Mismatch**: Domain is correct but username part looks suspicious (e.g. `ceo.microsoft@outlook.com` or `satya123@microsoft.com` if standard is `satya.n@`).
+            - **Email Pattern Mismatch**: Domain is correct but username part looks HIGHLY suspicious (e.g. `ceo.microsoft@outlook.com` or `satya123@microsoft.com`). If it's just a common variation (e.g. `ahmad.zafar` vs `zafar.ahmad`), DO NOT fail it.
         - **Unverified**: Cannot find enough info to confirm or deny.
 
         **Scoring (0-100):**
@@ -100,7 +100,7 @@ class VerificationService:
         - +30 for Identity Verified.
         - +30 for Employment Verified at this company.
         - +20 for Corporate Domain Match.
-        - +10 for Standard Email Pattern Match.
+        - +10 for Standard Email Pattern Match (Bonus).
         - +10 for Tier 1 Role, +5 for Tier 2 Role.
         - PENALTY: -100 if "Likely Fake".
 

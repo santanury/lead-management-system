@@ -36,7 +36,7 @@ class AIScoringService:
             
             # Here you can add deterministic logic to adjust the score.
             # For now, we'll primarily use the AI's judgment.
-            final_score = self._calculate_final_score(ai_score_details.get("score", 0), lead_input, verification_result)
+            final_score = self._calculate_final_score(ai_score_details.get("score", 0), lead_input, verification_result, enrichment_data)
             
             lead_score = LeadScore(
                 score=final_score,
@@ -83,7 +83,10 @@ class AIScoringService:
             - If the user claims to be from a large enterprise but the enriched data shows a small unknown shop, flag this as a risk.
             - If the email domain aligns with the website, treat it as verified.
         2.  **BANT Analysis:** Evaluate each BANT component based on the lead's message. Be critical. If information is missing, state that it's inferred or not available.
-        3.  **Lead Score:** Assign a score from 0 (very low quality) to 100 (perfect fit). A score of 85+ is "Hot", 60-84 is "Warm", and below 60 is "Cold".
+        3.  **Lead Score:** Assign a score from 0 to 100. **BE STRICT.** 
+            - **100/100** should be extremely rare (reserved for perfect, verified, immediate high-value deals).
+            - A typical "Good" lead should be in the **70-85** range.
+            - 85+ is "Hot", 60-84 is "Warm", below 60 is "Cold".
         4.  **High-Stakes Risk Guardrail:**
             - **Rule**: If the inferred Budget is HIGH (e.g., > $50,000) BUT the Verification Status is "Unverified" or "Likely Fake", you MUST penalize the score.
             - A high-budget claim from an unknown/unverified entity is suspect. CAP the score at 50 ("Cold") and mark explanation as "High Risk / Manual Review Needed".
@@ -102,26 +105,54 @@ class AIScoringService:
         Example of a bad lead: "Just looking for info."
         """
 
-    def _calculate_final_score(self, ai_score: int, lead_input: LeadInput, verification_result: VerificationResult) -> int:
+    def _calculate_final_score(self, ai_score: int, lead_input: LeadInput, verification_result: VerificationResult, enrichment_data: EnrichmentData) -> int:
         """
-        Applies deterministic adjustments to the AI-generated score.
-        For example, boost score for known strategic companies.
+        Applies deterministic adjustments to the AI-generated score and budget caps.
         """
         # CRITICAL: If flagged as Likely Fake, kill the score.
         if verification_result.status == LeadVerificationStatus.LIKELY_FAKE:
             return 0
-
-        score = ai_score
-        
-        # Boost for Verified Decision Maker
-        if verification_result.status == LeadVerificationStatus.VERIFIED_DECISION_MAKER:
-            score += 15
-        elif verification_result.status == LeadVerificationStatus.VERIFIED_EMPLOYEE:
-            score += 5
             
-        if "big corp" in lead_input.company_name.lower():
-            score += 5  # Add a small boost for enterprise leads
+        score = ai_score
+
+        # --- BUDGET TIER CAP LOGIC ---
+        import re
+        budget_val = 0
+        # Heuristic extraction of budget from notes
+        matches = re.findall(r'(\d+)(?:k|000)\b', lead_input.notes.lower())
+        if matches:
+            vals = [int(m) * 1000 for m in matches]
+            budget_val = max(vals)
+        else:
+             if "million" in lead_input.notes.lower() or "1m" in lead_input.notes.lower():
+                 budget_val = 1000000
+
+        # User Feedback logic: "Verified employee, decision maker, and big corp should be consider if proposal is good"
+        # Only apply bonuses if the base proposal is decent.
+        if score >= 50:
+            # 1. Verification / Authority Boost
+            if verification_result.status == LeadVerificationStatus.VERIFIED_DECISION_MAKER:
+                score += 10 
+            elif verification_result.status == LeadVerificationStatus.VERIFIED_EMPLOYEE:
+                score += 5
+            
+            # 2. Company Size Boost
+            company_size = enrichment_data.company_info.get("size", "0") if enrichment_data.company_info else "0"
+            size_str = str(company_size).lower()
+            if any(s in size_str for s in ["1000+", "5000+", "10,000+", "500+", "large", "enterprise", "public"]):
+                score += 10
+
+        # --- APPLY BUDGET CAPS (Final Ceiling) ---
+        # Ensure that small deals cannot reach 100/100, even with bonuses.
+        # < $10k -> Cap at 70 (Warm)
+        # $10k - $50k -> Cap at 85 (Warm/Hot border)
+        # > $50k -> No Cap (Hot)
         
+        if budget_val > 0 and budget_val < 10000:
+            score = min(score, 70) 
+        elif budget_val >= 10000 and budget_val < 50000:
+            score = min(score, 85)
+
         return min(max(score, 0), 100) # Clamp score between 0 and 100
 
     def _score_to_category(self, score: int) -> str:
