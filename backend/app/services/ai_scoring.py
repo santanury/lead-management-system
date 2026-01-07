@@ -33,6 +33,7 @@ class AIScoringService:
             # Extract the AI's dimensional analysis
             score_dimensions = ai_response.get("score_dimensions", {})
             risk_flags = ai_response.get("risk_flags", [])
+            follow_up_questions = ai_response.get("follow_up_questions", [])
             explanation = ai_response.get("explanation", "No explanation provided.")
 
             # Calculate the final weighted score Python-side for precision
@@ -43,7 +44,8 @@ class AIScoringService:
                 category=self._score_to_category(final_score),
                 explanation=explanation,
                 score_breakdown=score_breakdown,
-                risk_flags=risk_flags
+                risk_flags=risk_flags,
+                follow_up_questions=follow_up_questions
             )
             
             return bant_analysis, lead_score
@@ -119,6 +121,12 @@ class AIScoringService:
         - "Vague Requirements" (High urgency but no details).
         - "Contradictory Info".
 
+        **Follow-Up Questions (Context Building)**:
+        Generate 3-5 strategic, probing questions that a human sales agent should ask this lead to validate them further or move the deal forward.
+        - If Budget is vague, ask about constraints.
+        - If Authority is low, ask who else needs to be involved.
+        - If Needs are generic, ask about specific pain points.
+
         **Output Format (JSON):**
         {{
             "bant_analysis": {{ "budget": "...", "authority": "...", "need": "...", "timeline": "..." }},
@@ -131,6 +139,7 @@ class AIScoringService:
                 "intent_signals": <int 0-100>
             }},
             "risk_flags": ["List", "of", "risks", "found"],
+            "follow_up_questions": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"],
             "explanation": "Brief summary of why this score was given."
         }}
         """

@@ -102,6 +102,8 @@ async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_ses
             notes=lead_input.notes,
             email_valid=enrichment_data.email_valid,
             company_info=enrichment_data.company_info,
+            company_logo_url=enrichment_data.company_logo_url,
+            profile_image_url=enrichment_data.profile_image_url,
             budget_analysis=bant_analysis.budget,
             authority_analysis=bant_analysis.authority,
             need_analysis=bant_analysis.need,
@@ -120,6 +122,7 @@ async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_ses
             intent_evidence=verification_result.intent_evidence,
             score_breakdown=lead_score.score_breakdown,
             risk_flags=lead_score.risk_flags,
+            follow_up_questions=lead_score.follow_up_questions,
             queue=routing_decision.queue,
             routing_reason=routing_decision.reason
         )

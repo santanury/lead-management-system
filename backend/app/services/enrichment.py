@@ -18,6 +18,8 @@ class EnrichmentService:
         return EnrichmentData(
             company_info=company_info,
             email_valid=is_valid_email,
+            company_logo_url=company_info.get("company_logo_url") if company_info else None,
+            profile_image_url=company_info.get("profile_image_url") if company_info else None
         )
 
     def _validate_email(self, email: str) -> bool:
@@ -40,12 +42,15 @@ class EnrichmentService:
         prompt = f"""
         You are a data enrichment bot with access to Google Search.
         Use Google Search to find the latest information about the company "{company_name}" (Domain: {domain}).
+        Also try to find a URL for their official logo and a generic profile image placeholder or the CEO's image if relevant.
         
         Provide a JSON object with:
         - company_name (official name)
         - industry (e.g. Technology, Healthcare, Finance)
         - size (approx employees, e.g. "10-50", "1000+")
         - website (official URL)
+        - company_logo_url (URL to a high-quality logo image, or null)
+        - profile_image_url (URL to a relevant profile image, or null)
         
         Return ONLY valid JSON.
         """
@@ -63,6 +68,8 @@ class EnrichmentService:
                 "industry": "Unknown",
                 "size": "Unknown",
                 "website": "Unknown",
+                "company_logo_url": None,
+                "profile_image_url": None
             }
 
 enrichment_service = EnrichmentService()

@@ -67,8 +67,17 @@ export interface Lead {
     industry?: string;
     size?: string;
     website?: string;
+    company_logo_url?: string;
+    profile_image_url?: string;
     [key: string]: any;
   };
+  company_logo_url?: string;
+  profile_image_url?: string;
+
+  // New Fields
+  score_breakdown?: Record<string, number>;
+  risk_flags?: string[];
+  follow_up_questions?: string[];
 }
 
 const API_BASE_URL = "http://localhost:8000/api/v1";

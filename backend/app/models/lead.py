@@ -49,6 +49,8 @@ class BANTAnalysis(BaseModel):
 class EnrichmentData(BaseModel):
     company_info: Optional[dict] = Field(None, description="Enriched information about the company.")
     email_valid: bool = Field(True, description="Whether the email address is valid.")
+    company_logo_url: Optional[str] = Field(None, description="URL of the company logo.")
+    profile_image_url: Optional[str] = Field(None, description="URL of the lead's profile image.")
 
 class LeadScore(BaseModel):
     score: int = Field(..., ge=0, le=100, description="Numeric score from 0-100.")
@@ -56,6 +58,7 @@ class LeadScore(BaseModel):
     explanation: str = Field(..., description="AI-generated explanation for the score.")
     score_breakdown: Optional[Dict[str, int]] = Field(default=None, description="Detailed breakdown of the score.")
     risk_flags: Optional[List[str]] = Field(default=None, description="List of identified risk factors.")
+    follow_up_questions: Optional[List[str]] = Field(default=None, description="Suggested follow-up questions for the reviewer.")
 
 class RoutingDecision(BaseModel):
     queue: str = Field(..., description="The queue the lead is routed to: Sales, Presales, or Nurture.")
@@ -84,6 +87,8 @@ class Lead(SQLModel, table=True):
     # Enrichment
     email_valid: bool
     company_info: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    company_logo_url: Optional[str] = Field(default=None)
+    profile_image_url: Optional[str] = Field(default=None)
 
     # BANT
     budget_analysis: str
@@ -97,6 +102,7 @@ class Lead(SQLModel, table=True):
     explanation: str
     score_breakdown: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
     risk_flags: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    follow_up_questions: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
 
     # Verification
     verification_status: Optional[str] = Field(default=LeadVerificationStatus.UNVERIFIED.value)
