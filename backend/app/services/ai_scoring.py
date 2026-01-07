@@ -127,6 +127,11 @@ class AIScoringService:
         - If Authority is low, ask who else needs to be involved.
         - If Needs are generic, ask about specific pain points.
 
+        **NEGATIVE CONSTRAINTS (CRITICAL):**
+        - DO NOT ask about "triggers for budget expansion" or upselling triggers in the first interaction.
+        - DO NOT ask about "long-term spending increases" beyond the initial scope yet.
+        - Focus on VALIDATING the current request, not expanding it immediately.
+
         **Output Format (JSON):**
         {{
             "bant_analysis": {{ "budget": "...", "authority": "...", "need": "...", "timeline": "..." }},

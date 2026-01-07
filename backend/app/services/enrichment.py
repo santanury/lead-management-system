@@ -39,6 +39,9 @@ class EnrichmentService:
         # Extract domain from email if possible for better search
         domain = email.split('@')[-1] if email and "@" in email else ""
         
+        # Determine fallback logo URL
+        fallback_logo_url = f"https://logo.clearbit.com/{domain}" if domain else None
+        
         prompt = f"""
         You are a data enrichment bot with access to Google Search.
         Use Google Search to find the latest information about the company "{company_name}" (Domain: {domain}).
@@ -58,8 +61,18 @@ class EnrichmentService:
         try:
             print(f"🔍 [EnrichmentService] Searching Google for: {company_name}")
             # Use JSON response method with search enabled
+            # Use JSON response method with search enabled
             result = gemini_client.generate_json_response(prompt, use_search=True)
             print(f"✅ [EnrichmentService] Search Result: {result}")
+            
+            # Fallback/Override for logo if Gemini returns nothing or a broken link (basic check)
+            if fallback_logo_url:
+                 # If Gemini didn't find one, or we want to trust Clearbit
+                 current_logo = result.get("company_logo_url")
+                 if not current_logo or "http" not in current_logo:
+                     result["company_logo_url"] = fallback_logo_url
+                     print(f"⚠️ [EnrichmentService] Used Clearbit fallback for logo: {fallback_logo_url}")
+
             return result
         except Exception as e:
             print(f"❌ [EnrichmentService] Enrichment failed: {e}")
@@ -68,7 +81,7 @@ class EnrichmentService:
                 "industry": "Unknown",
                 "size": "Unknown",
                 "website": "Unknown",
-                "company_logo_url": None,
+                "company_logo_url": fallback_logo_url,
                 "profile_image_url": None
             }
 
