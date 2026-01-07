@@ -40,7 +40,8 @@ class EnrichmentService:
         domain = email.split('@')[-1] if email and "@" in email else ""
         
         # Determine fallback logo URL
-        fallback_logo_url = f"https://logo.clearbit.com/{domain}" if domain else None
+        # Switched to Google Favicons as Clearbit was reported unreachable
+        fallback_logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else None
         
         prompt = f"""
         You are a data enrichment bot with access to Google Search.
@@ -71,7 +72,7 @@ class EnrichmentService:
                  current_logo = result.get("company_logo_url")
                  if not current_logo or "http" not in current_logo:
                      result["company_logo_url"] = fallback_logo_url
-                     print(f"⚠️ [EnrichmentService] Used Clearbit fallback for logo: {fallback_logo_url}")
+                     print(f"⚠️ [EnrichmentService] Used Google Favicon fallback for logo: {fallback_logo_url}")
 
             return result
         except Exception as e:
