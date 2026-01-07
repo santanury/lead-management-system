@@ -28,33 +28,14 @@ export function LeadDetailsDialog({
       <DialogContent className="max-w-3xl max-h-[85vh]">
         <DialogHeader>
           <div className="flex items-start gap-4 pr-8">
-            {lead.profile_image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={lead.profile_image_url}
-                alt={lead.first_name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-border"
-                onError={(e) => (e.currentTarget.style.display = "none")}
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-2xl font-bold text-muted-foreground">
-                {lead.first_name[0]}
-              </div>
-            )}
+            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-2xl font-bold text-muted-foreground">
+              {lead.first_name[0]}
+            </div>
 
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <DialogTitle className="text-2xl flex items-center gap-2">
                   {lead.first_name} {lead.last_name}
-                  {lead.company_logo_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={lead.company_logo_url}
-                      alt="Logo"
-                      className="h-6 w-auto object-contain ml-2 opacity-80"
-                      onError={(e) => (e.currentTarget.style.display = "none")}
-                    />
-                  )}
                 </DialogTitle>
                 <Badge
                   className="text-lg px-4 py-1"

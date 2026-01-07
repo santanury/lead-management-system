@@ -39,22 +39,15 @@ class EnrichmentService:
         # Extract domain from email if possible for better search
         domain = email.split('@')[-1] if email and "@" in email else ""
         
-        # Determine fallback logo URL
-        # Switched to Google Favicons as Clearbit was reported unreachable
-        fallback_logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else None
-        
         prompt = f"""
         You are a data enrichment bot with access to Google Search.
         Use Google Search to find the latest information about the company "{company_name}" (Domain: {domain}).
-        Also try to find a URL for their official logo and a generic profile image placeholder or the CEO's image if relevant.
         
         Provide a JSON object with:
         - company_name (official name)
         - industry (e.g. Technology, Healthcare, Finance)
         - size (approx employees, e.g. "10-50", "1000+")
         - website (official URL)
-        - company_logo_url (URL to a high-quality logo image, or null)
-        - profile_image_url (URL to a relevant profile image, or null)
         
         Return ONLY valid JSON.
         """
@@ -66,15 +59,16 @@ class EnrichmentService:
             result = gemini_client.generate_json_response(prompt, use_search=True)
             print(f"✅ [EnrichmentService] Search Result: {result}")
             
-            # Fallback/Override for logo if Gemini returns nothing or a broken link (basic check)
-            if fallback_logo_url:
-                 # If Gemini didn't find one, or we want to trust Clearbit
-                 current_logo = result.get("company_logo_url")
-                 if not current_logo or "http" not in current_logo:
-                     result["company_logo_url"] = fallback_logo_url
-                     print(f"⚠️ [EnrichmentService] Used Google Favicon fallback for logo: {fallback_logo_url}")
-
-            return result
+            # Ensure returning dict doesn't have old keys if they somehow appear (though prompt shouldn't ask for them)
+            # Just return what we asked for.
+            return {
+                "company_name": result.get("company_name", company_name),
+                "industry": result.get("industry", "Unknown"),
+                "size": result.get("size", "Unknown"),
+                "website": result.get("website", "Unknown"),
+                "company_logo_url": None, # Explicitly None as requested
+                "profile_image_url": None # Explicitly None as requested
+            }
         except Exception as e:
             print(f"❌ [EnrichmentService] Enrichment failed: {e}")
             return {
@@ -82,7 +76,7 @@ class EnrichmentService:
                 "industry": "Unknown",
                 "size": "Unknown",
                 "website": "Unknown",
-                "company_logo_url": fallback_logo_url,
+                "company_logo_url": None,
                 "profile_image_url": None
             }
 
