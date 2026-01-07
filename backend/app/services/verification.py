@@ -40,7 +40,9 @@ class VerificationService:
                 authority_tier=tier,
                 identity_verified=verification_response.get("identity_verified", False),
                 employment_verified=verification_response.get("employment_verified", False),
-                reason=verification_response.get("verification_reason", "No reason provided.")
+                reason=verification_response.get("verification_reason", "No reason provided."),
+                intent_signal=verification_response.get("intent_signal", "None"),
+                intent_evidence=verification_response.get("intent_evidence", None)
             )
 
         except Exception as e:
@@ -78,12 +80,18 @@ class VerificationService:
                 - Tier 3: Manager, Lead.
                 - Tier 4: Analyst, Associate, Engineer, Specialist.
             - Does the role match the company size? (e.g., A "CEO" of a 1-person company is technically Tier 1 but low authority in practice, but sticking to title is fine for now).
+            - **Title Variations**: "Associate Delivery Head" vs "Delivery Head" is ACCEPTABLE. Close matches are OK. Only flag if completely different (e.g. "Intern" vs "VP").
         4.  **Email Check**: 
             - **Domain**: Does the email domain match the official website? ({enrichment_data.company_info.get('website', 'N/A') if enrichment_data.company_info else '?'})
+            - **IMPORTANT**: Allow Country Code TLDs! If website is `webskitters.com` and email is `@webskitters.in` (or .co.uk, .de), this is valid. MATCH THE ROOT DOMAIN.
             - **Pattern Intelligence**: Search for "email format for {lead_input.company_name}" or guess based on typical corporate patterns (e.g., firstname.lastname@, firstinitial.lastname@). 
             - Does `{lead_input.email}` look like a standard corporate email for this company?
             - If email is @gmail/@yahoo but claiming to be an Executive at a Big Corp -> FLAG AS FAKE/PERSONAL.
-            - If email uses a weird variation (e.g. `soumya17@` vs `soumya.chaki@`) -> Downgrade confidence.
+        5.  **Intent/Signal Validation (Context: "{lead_input.notes}")**:
+            - Is there any PUBLIC EVIDENDCE that {lead_input.company_name} is interested in the requested topic?
+            - Search for: "{lead_input.company_name} investment {lead_input.notes} news" or "{lead_input.company_name} digital transformation".
+            - Example: If they ask for "AI HR", did "Indus Net" announce any AI expansion?
+            - Determine: **Strong** (News found), **Weak** (Inferred/Logical), **None** (No evidence/Mismatch).
 
         **Output Logic:**
         - **Verified Decision Maker**: Identity confirmed + Employment confirmed + Tier 1 or 2. (Email Pattern Match is preferred but NOT required for small companies).
@@ -93,15 +101,17 @@ class VerificationService:
             - Famous name (e.g. Satya Nadella) with non-corporate email.
             - Non-existent person at a major company.
             - **Email Pattern Mismatch**: Domain is correct but username part looks HIGHLY suspicious (e.g. `ceo.microsoft@outlook.com` or `satya123@microsoft.com`). If it's just a common variation (e.g. `ahmad.zafar` vs `zafar.ahmad`), DO NOT fail it.
+            - **NOTE**: `webskitters.in` vs `webskitters.com` is NOT a mismatch. It is a VALID variant.
         - **Unverified**: Cannot find enough info to confirm or deny.
 
         **Scoring (0-100):**
         - Start at 0.
         - +30 for Identity Verified.
         - +30 for Employment Verified at this company.
-        - +20 for Corporate Domain Match.
+        - +20 for Corporate Domain Match (Include ccTLDs).
         - +10 for Standard Email Pattern Match (Bonus).
         - +10 for Tier 1 Role, +5 for Tier 2 Role.
+        - +10 Bonus for **Strong Intent Signal**.
         - PENALTY: -100 if "Likely Fake".
 
         **Return JSON:**
@@ -111,7 +121,9 @@ class VerificationService:
             "authority_tier": "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Unknown",
             "identity_verified": <bool>,
             "employment_verified": <bool>,
-            "verification_reason": "<Short explanation>"
+            "verification_reason": "<Short explanation>",
+            "intent_signal": "Strong" | "Weak" | "None",
+            "intent_evidence": "<Short evidence or link>"
         }}
         """
 
@@ -139,7 +151,9 @@ class VerificationService:
             authority_tier=AuthorityTier.UNKNOWN,
             identity_verified=False,
             employment_verified=False,
-            reason="Verification failed due to technical error."
+            reason="Verification failed due to technical error.",
+            intent_signal="None",
+            intent_evidence=None
         )
 
 verification_service = VerificationService()

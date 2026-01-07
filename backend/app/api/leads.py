@@ -116,6 +116,10 @@ async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_ses
             identity_verified=verification_result.identity_verified,
             employment_verified=verification_result.employment_verified,
             verification_reason=verification_result.reason,
+            intent_signal=verification_result.intent_signal,
+            intent_evidence=verification_result.intent_evidence,
+            score_breakdown=lead_score.score_breakdown,
+            risk_flags=lead_score.risk_flags,
             queue=routing_decision.queue,
             routing_reason=routing_decision.reason
         )

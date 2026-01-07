@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Session
 from pydantic import BaseModel, EmailStr
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from enum import Enum
 from datetime import datetime
 from sqlalchemy import JSON, Column
@@ -28,6 +28,8 @@ class VerificationResult(BaseModel):
     identity_verified: bool
     employment_verified: bool
     reason: str
+    intent_signal: Optional[str] = "None"
+    intent_evidence: Optional[str] = None
 
 # --- API Models (Pydantic/SQLModel without table) ---
 
@@ -52,6 +54,8 @@ class LeadScore(BaseModel):
     score: int = Field(..., ge=0, le=100, description="Numeric score from 0-100.")
     category: str = Field(..., description="Category: Hot, Warm, or Cold.")
     explanation: str = Field(..., description="AI-generated explanation for the score.")
+    score_breakdown: Optional[Dict[str, int]] = Field(default=None, description="Detailed breakdown of the score.")
+    risk_flags: Optional[List[str]] = Field(default=None, description="List of identified risk factors.")
 
 class RoutingDecision(BaseModel):
     queue: str = Field(..., description="The queue the lead is routed to: Sales, Presales, or Nurture.")
@@ -91,6 +95,8 @@ class Lead(SQLModel, table=True):
     score: int
     category: str
     explanation: str
+    score_breakdown: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    risk_flags: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
 
     # Verification
     verification_status: Optional[str] = Field(default=LeadVerificationStatus.UNVERIFIED.value)
@@ -99,6 +105,8 @@ class Lead(SQLModel, table=True):
     identity_verified: bool = Field(default=False)
     employment_verified: bool = Field(default=False)
     verification_reason: Optional[str] = Field(default=None)
+    intent_signal: Optional[str] = Field(default="None") # "Strong", "Weak", "None"
+    intent_evidence: Optional[str] = Field(default=None)
 
     # Routing
     queue: str

@@ -5,6 +5,7 @@ import json
 class AIScoringService:
     """
     Service for scoring leads using AI (Gemini).
+    Now implements the FULL Multi-Factor Scoring Framework.
     """
 
     def score_lead(self, lead_input: LeadInput, enrichment_data: EnrichmentData, verification_result: VerificationResult) -> (BANTAnalysis, LeadScore):
@@ -16,8 +17,6 @@ class AIScoringService:
         from app.models.settings import Settings
         from sqlmodel import select
         
-        # Helper to get session since we are in a service
-        # In a larger app, we'd pass session as dependency
         with next(get_session()) as session:
             settings_db = session.exec(select(Settings)).first()
             selected_model = settings_db.selected_model if settings_db else "gemini-2.5-flash"
@@ -31,138 +30,190 @@ class AIScoringService:
             # Parse the AI response into our Pydantic models
             bant_analysis = BANTAnalysis(**ai_response.get("bant_analysis", {}))
             
-            # The AI provides a preliminary score and explanation
-            ai_score_details = ai_response.get("lead_score", {})
-            
-            # Here you can add deterministic logic to adjust the score.
-            # For now, we'll primarily use the AI's judgment.
-            final_score = self._calculate_final_score(ai_score_details.get("score", 0), lead_input, verification_result, enrichment_data)
+            # Extract the AI's dimensional analysis
+            score_dimensions = ai_response.get("score_dimensions", {})
+            risk_flags = ai_response.get("risk_flags", [])
+            explanation = ai_response.get("explanation", "No explanation provided.")
+
+            # Calculate the final weighted score Python-side for precision
+            final_score, score_breakdown = self._calculate_weighted_score(score_dimensions, risk_flags, verification_result)
             
             lead_score = LeadScore(
                 score=final_score,
                 category=self._score_to_category(final_score),
-                explanation=ai_score_details.get("explanation", "No explanation provided."),
+                explanation=explanation,
+                score_breakdown=score_breakdown,
+                risk_flags=risk_flags
             )
             
             return bant_analysis, lead_score
 
         except (json.JSONDecodeError, TypeError, KeyError) as e:
             print(f"Failed to parse AI response: {e}")
-            # Fallback to a default/error state if AI fails
             return self._get_fallback_scoring()
 
     def _build_prompt(self, lead_input: LeadInput, enrichment_data: EnrichmentData, verification_result: VerificationResult) -> str:
-        """
-        Constructs the prompt for the Gemini API.
-        """
         return f"""
-        Analyze the following sales lead and perform a BANT analysis (Budget, Authority, Need, Timeline). 
-        Based on your analysis, provide a lead score from 0 to 100 and a brief explanation.
-
+        You are an Expert Lead Qualification Agent. Your goal is to score sales leads using a STRICT Multi-Factor Scoring Framework.
+        
         **Lead Information:**
-        - First Name: {lead_input.first_name}
-        - Last Name: {lead_input.last_name}
+        - Name: {lead_input.first_name} {lead_input.last_name}
         - Company: {lead_input.company_name}
         - Email: {lead_input.email}
-        - Notes/Message: "{lead_input.notes}"
+        - Message: "{lead_input.notes}"
 
-        **Verification & Authority Check (Pre-Computed):**
+        **Verification Context (Pre-Computed):**
         - Status: {verification_result.status.value}
-        - Verified Score: {verification_result.score}/100
+        - Identity Verified: {verification_result.identity_verified}
+        - Employment Verified: {verification_result.employment_verified}
         - Authority Tier: {verification_result.authority_tier.value}
-        - Reason: {verification_result.reason}
+        - Intent Signal: {verification_result.intent_signal}
+        - Intent Evidence: {verification_result.intent_evidence}
 
-        **Enriched Company Data (from Google Search):**
-        - Official Name: {enrichment_data.company_info.get('company_name', 'N/A') if enrichment_data.company_info else 'N/A'}
+        **Enriched Company Data:**
         - Industry: {enrichment_data.company_info.get('industry', 'N/A') if enrichment_data.company_info else 'N/A'}
         - Size: {enrichment_data.company_info.get('size', 'N/A') if enrichment_data.company_info else 'N/A'}
         - Website: {enrichment_data.company_info.get('website', 'N/A') if enrichment_data.company_info else 'N/A'}
+
+        **SCORING INSTRUCTIONS (Multi-Factor Model):**
+        Evaluate the lead on these 6 dimensions (0-100 scale for each):
+
+        1. **Authenticity (Weight: 30%)**: 
+           - Is the person real? Do they work there? 
+           - Used Pre-computed Verification Status.
+           - Score 100 if "Verified Decision Maker" or "Verified Employee".
+           - Score 50 if "Unverified" but looks plausible (not obviously fake).
+           - Score 0 ONLY if "Likely Fake".
+
+        2. **Authority (Weight: 20%)**:
+           - Do they have buying power? 
+           - 100 for Tier 1 (CXO), 80 for Tier 2 (Director/VP), 50 for Tier 3 (Manager), 20 for Individual Contributor.
+
+        3. **Budget Realism (Weight: 10%)**:
+           - Does the implied/stated budget match the company size? 
+           - High score (80-100) if budget is clear and realistic.
+           - Mid score (50) if budget is realistic but vague.
+           - Low score (0-30) if unrealistic (e.g. $1M from a 1-person shop or $500 from a big corp).
+
+        4. **Requirement Clarity (Weight: 10%)**:
+           - How specific is the request? 
+           - High score (80-100) for specific details (tech stack, timeline). 
+           - Low score (20-40) for "Hi, info please".
+
+        5. **Organizational Footprint (Weight: 10%)**:
+           - Company maturity/size. 
+           - High score (80-100) for established/large companies. 
+           - Mid score (50-70) for legitimate SMEs. 
+           - Low score (20-40) for unknowns/startups.
+
+        6. **Intent Signals (Weight: 20%)**:
+           - Is there evidence of need? 
+           - Used Pre-computed Intent Signal.
+           - Score 100 for "Strong Signal" (News/Reports).
+           - Score 60 for "Weak/Inferred Signal" (Logical need + Industry match).
+           - Score 20 for "No Signal".
+
+        **Risk Factors (Negative Modifiers)**:
+        Identify any specific risks that should LOWER the score:
+        - "Industry Mismatch" (e.g. Grocery asking for Cloud without context).
+        - "Vague Requirements" (High urgency but no details).
+        - "Contradictory Info".
+
+        **Output Format (JSON):**
+        {{
+            "bant_analysis": {{ "budget": "...", "authority": "...", "need": "...", "timeline": "..." }},
+            "score_dimensions": {{
+                "authenticity": <int 0-100>,
+                "authority": <int 0-100>,
+                "budget_realism": <int 0-100>,
+                "requirement_clarity": <int 0-100>,
+                "organizational_footprint": <int 0-100>,
+                "intent_signals": <int 0-100>
+            }},
+            "risk_flags": ["List", "of", "risks", "found"],
+            "explanation": "Brief summary of why this score was given."
+        }}
+        """
+
+    def _calculate_weighted_score(self, dimensions: dict, risk_flags: list, verification_result: VerificationResult) -> (int, dict):
+        """
+        Calculates the weighted final score based on the 6 dimensions and applies modifiers.
+        """
+        # Weights
+        W_AUTHENTICITY = 0.30
+        W_AUTHORITY = 0.20
+        W_BUDGET = 0.10
+        W_CLARITY = 0.10
+        W_FOOTPRINT = 0.10
+        W_INTENT = 0.20
+
+        # Extract scores (safely default to 0 if missing)
+        s_auth = dimensions.get("authenticity", 0)
+        s_auth_tier = dimensions.get("authority", 0)
+        s_budget = dimensions.get("budget_realism", 0)
+        s_clarity = dimensions.get("requirement_clarity", 0)
+        s_footprint = dimensions.get("organizational_footprint", 0)
+        s_intent = dimensions.get("intent_signals", 0)
+
+        # 1. Base Weighted Score
+        base_score = (
+            (s_auth * W_AUTHENTICITY) +
+            (s_auth_tier * W_AUTHORITY) +
+            (s_budget * W_BUDGET) +
+            (s_clarity * W_CLARITY) +
+            (s_footprint * W_FOOTPRINT) +
+            (s_intent * W_INTENT)
+        )
+
+        # 2. Risk Penalties
+        # Apply -10 for each risk flag found
+        penalty = len(risk_flags) * 10
         
-        **Instructions:**
-        1.  **Verification:** Cross-reference the user's claims with the enriched company data. 
-            - If the user claims to be from a large enterprise but the enriched data shows a small unknown shop, flag this as a risk.
-            - If the email domain aligns with the website, treat it as verified.
-        2.  **BANT Analysis:** Evaluate each BANT component based on the lead's message. Be critical. If information is missing, state that it's inferred or not available.
-        3.  **Lead Score:** Assign a score from 0 to 100. **BE STRICT.** 
-            - **100/100** should be extremely rare (reserved for perfect, verified, immediate high-value deals).
-            - A typical "Good" lead should be in the **70-85** range.
-            - 85+ is "Hot", 60-84 is "Warm", below 60 is "Cold".
-        4.  **High-Stakes Risk Guardrail:**
-            - **Rule**: If the inferred Budget is HIGH (e.g., > $50,000) BUT the Verification Status is "Unverified" or "Likely Fake", you MUST penalize the score.
-            - A high-budget claim from an unknown/unverified entity is suspect. CAP the score at 50 ("Cold") and mark explanation as "High Risk / Manual Review Needed".
-        5.  **Explanation:** Justify your score in one or two sentences. Explicitly mention if the company background check (enrichment) positively or negatively influenced the score.
-            - **CRITICAL:** Your explanation MUST be consistent with the score key.
-            - If score < 60, do NOT call it a "warm" lead. Call it "Cold", "Weak", or "High Risk".
-            - If score is 60-84, call it "Warm" or "Promising".
-            - If score is 85+, call it "Hot" or "Excellent".
+        final_score = base_score - penalty
 
-        **Output Format:**
-        Return a single JSON object with two keys: "bant_analysis" and "lead_score".
-        - "bant_analysis" should be an object with keys: "budget", "authority", "need", "timeline".
-        - "lead_score" should be an object with keys: "score" (integer) and "explanation" (string).
-
-        Example of a good lead: "We have a 20k budget approved and need to implement a solution in the next quarter. I am the department head responsible for this decision."
-        Example of a bad lead: "Just looking for info."
-        """
-
-    def _calculate_final_score(self, ai_score: int, lead_input: LeadInput, verification_result: VerificationResult, enrichment_data: EnrichmentData) -> int:
-        """
-        Applies deterministic adjustments to the AI-generated score and budget caps.
-        """
-        # CRITICAL: If flagged as Likely Fake, kill the score.
+        # 3. FRAUD Override
         if verification_result.status == LeadVerificationStatus.LIKELY_FAKE:
-            return 0
-            
-        score = ai_score
-
-        # --- BUDGET TIER CAP LOGIC ---
-        import re
-        budget_val = 0
-        # Heuristic extraction of budget from notes
-        matches = re.findall(r'(\d+)(?:k|000)\b', lead_input.notes.lower())
-        if matches:
-            vals = [int(m) * 1000 for m in matches]
-            budget_val = max(vals)
+            final_score = 0
+            s_auth = 0 # Force auth to 0 in breakdown
         else:
-             if "million" in lead_input.notes.lower() or "1m" in lead_input.notes.lower():
-                 budget_val = 1000000
+            # 4. Baseline Score Rule
+            # "No lead should score 0 unless it is explicitely fraudulent"
+            # "Introduce a minimum baseline score (e.g., 20) for any non-fraudulent, coherent inquiry."
+            final_score = max(final_score, 20)
 
-        # User Feedback logic: "Verified employee, decision maker, and big corp should be consider if proposal is good"
-        # Only apply bonuses if the base proposal is decent.
-        if score >= 50:
-            # 1. Verification / Authority Boost
-            if verification_result.status == LeadVerificationStatus.VERIFIED_DECISION_MAKER:
-                score += 10 
-            elif verification_result.status == LeadVerificationStatus.VERIFIED_EMPLOYEE:
-                score += 5
-            
-            # 2. Company Size Boost
-            company_size = enrichment_data.company_info.get("size", "0") if enrichment_data.company_info else "0"
-            size_str = str(company_size).lower()
-            if any(s in size_str for s in ["1000+", "5000+", "10,000+", "500+", "large", "enterprise", "public"]):
-                score += 10
+        final_score = int(round(final_score))
+        final_score = min(max(final_score, 0), 100)
 
-        # --- APPLY BUDGET CAPS (Final Ceiling) ---
-        # Ensure that small deals cannot reach 100/100, even with bonuses.
-        # < $10k -> Cap at 70 (Warm)
-        # $10k - $50k -> Cap at 85 (Warm/Hot border)
-        # > $50k -> No Cap (Hot)
-        
-        if budget_val > 0 and budget_val < 10000:
-            score = min(score, 70) 
-        elif budget_val >= 10000 and budget_val < 50000:
-            score = min(score, 85)
+        breakdown = {
+            "Authenticity": s_auth,
+            "Authority": s_auth_tier,
+            "Budget": s_budget,
+            "Clarity": s_clarity,
+            "Footprint": s_footprint,
+            "Intent": s_intent,
+            "RiskPenalty": -penalty
+        }
 
-        return min(max(score, 0), 100) # Clamp score between 0 and 100
+        return final_score, breakdown
 
     def _score_to_category(self, score: int) -> str:
-        """Converts a numeric score to a category."""
-        if score >= 85:
-            return "Hot"
+        """Converts a numeric score to a category based on new bands."""
+        # 90-100: Rare, exceptionally strong
+        # 80-90: High-confidence strategic lead
+        # 60-79: Strong lead, pursue actively
+        # 40-59: Moderate lead, needs qualification
+        # 20-39: Low confidence, early-stage
+        
+        if score >= 90:
+            return "Exceptional"
+        elif score >= 80:
+            return "High Confidence"
         elif score >= 60:
-            return "Warm"
+            return "Strong"
+        elif score >= 40:
+            return "Moderate"
         else:
-            return "Cold"
+            return "Low Confidence"
 
     def _get_fallback_scoring(self) -> (BANTAnalysis, LeadScore):
         """
@@ -175,7 +226,7 @@ class AIScoringService:
             timeline="Analysis failed."
         )
         score = LeadScore(
-            score=0,
+            score=20, # Baseline score even for errors? Or 0 for error? Let's say 0 for system error.
             category="Unscored",
             explanation="Could not process lead due to an internal error."
         )
