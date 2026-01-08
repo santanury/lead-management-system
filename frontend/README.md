@@ -1,65 +1,93 @@
-# Lead Automation & AI Scoring System
+# 🎨 Lead Management Frontend
 
-This is a Next.js application that provides a front-end for a lead automation and AI scoring system. It allows users to manage, score, and analyze leads efficiently.
+> The modern, responsive user interface for the AI Lead Management System. Built with Next.js 16, Tailwind CSS v4, and Shadcn UI.
 
-## Getting Started
+## 🚀 Getting Started
 
-First, ensure you have Node.js and yarn installed. Then, run the development server:
+### Prerequisites
 
-```bash
-yarn install
-yarn dev
+- Node.js 18+
+- npm (or yarn/pnpm)
+
+### installation
+
+1.  Navigate to the directory:
+
+    ```bash
+    cd frontend
+    ```
+
+2.  Install dependencies:
+
+    ```bash
+    npm install
+    # or
+    yarn install
+    ```
+
+3.  **Environment Setup** (Important):
+    Create a `.env.local` file in the root of `frontend/` to configure the backend connection:
+
+    ```env
+    NEXT_PUBLIC_API_URL=http://localhost:8000
+    ```
+
+4.  Run the development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+## 📂 Architecture & Structure
+
+```
+frontend/
+├── app/                  # Next.js App Router pages
+│   ├── dashboard/        # Dashboard view
+│   ├── leads/            # Lead management & lists
+│   ├── scoring/          # AI scoring configuration
+│   └── layout.tsx        # Main application layout
+├── components/           # Reusable UI components
+│   ├── ui/               # Shadcn UI primitives (buttons, dialogs, etc.)
+│   └── lead-details...   # Feature-specific components
+├── lib/                  # Utilities and API clients
+│   └── api.ts            # Axios configuration & API calls
+└── styles/               # Global styles (Tailwind)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. The app will automatically redirect you to the main dashboard.
+## ✨ Key Features
 
-## User Guide
+### 1. 📊 Interactive Dashboard
 
-The application is organized into four main sections:
+- Real-time KPIs (Total Leads, Conversion Rate).
+- Visual charts powered by `Recharts`.
+- Recent leads feed.
 
-### 1. Dashboard
+### 2. 🤖 AI-Enriched Lead View
 
-The **Dashboard** is the landing page and provides a high-level overview of your lead management system.
+- **Lead Details Dialog**: A complex component that displays:
+  - **Company Logo**: Auto-fetched via Google Favicons.
+  - **AI Summary**: Narrative explanation of the lead's score.
+  - **BANT Analysis**: Breakdown of Budget, Authority, Need, and Timeline.
+  - **Strategic Hints**: AI-generated follow-up questions.
 
--   **Key Performance Indicators (KPIs):** At the top of the page, you'll find quick statistics for:
-    -   **Total Leads:** The total number of leads in the system.
-    -   **Qualified Leads:** The number of leads that have met the qualification criteria.
-    -   **Avg. Score:** The average BANT score across all leads.
-    -   **New Leads Today:** The number of new leads added today.
--   **Lead Conversion Rate Chart:** A visual representation of leads generated over time.
--   **Recent Leads Table:** A list of the 5 most recently added leads for quick access.
+### 3. ⚙️ Configuration
 
-### 2. Leads
+- **Theme Toggle**: Dark/Light mode support.
+- **Scoring Settings**: Adjust the weights for BANT parameters vs. Intent signals.
 
-The **Leads** page is where you can view and manage all your leads in a comprehensive table.
+## 🛠️ Tech Stack
 
--   **Search:** Use the search bar to find specific leads by name, email, or company.
--   **Filtering:** You can filter the lead list by:
-    -   **Status:** (All, Qualified, Pending, Rejected)
-    -   **Score:** (All, Low, Medium, High)
--   **Pagination:** The table is paginated for easy navigation through a large number of leads.
+- **Framework**: Next.js 16 (App Router)
+- **Styling**: Tailwind CSS v4
+- **Components**: Radix UI + Shadcn
+- **State**: Redux Toolkit (for global state management)
+- **Icons**: Lucide React
 
-### 3. Scoring
+## 🧪 Best Practices
 
-The **Scoring** page allows you to configure the BANT (Budget, Authority, Need, Timeline) model used by the AI to score leads.
-
--   **Scoring Parameters:** Adjust the weight of each BANT component to align the AI's scoring logic with your business priorities. The weights must sum to 1.
--   **Sample AI Output:** A JSON object displays a sample of the data returned by the AI after scoring a lead, helping you understand the model's output.
-
-### 4. Settings
-
-The **Settings** page contains general configuration options for the application.
-
--   **Automation Settings:**
-    -   **Auto-Lead Routing:** Toggle to automatically assign new leads to team members.
-    -   **External Enrichment:** Toggle to enable or disable third-party services for data enrichment.
--   **AI Model Selection:** Choose the Large Language Model (LLM) you want to use for lead scoring and analysis from the dropdown menu.
-
-## Tech Stack
-
--   **Framework:** Next.js (App Router)
--   **Language:** TypeScript
--   **Styling:** TailwindCSS
--   **UI Components:** shadcn/ui
--   **Charts:** Recharts
--   **State Management:** React State/Context (Zustand planned for future)
+- **Component Composition**: UI is built using small, composable atoms.
+- **Server/Client Components**: Strategic use of `"use client"` for interactive parts while keeping pages server-rendered where possible.
+- **Type Safety**: Full TypeScript integration.
