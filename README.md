@@ -19,6 +19,7 @@ This project is a functional MVP demonstrating **AI Readiness** in CRM workflows
 - **📊 Visual Dashboard**: A modern, dark-mode capability dashboard built with **Next.js** and **Tailwind CSS**.
 - **🛡️ Verification Guardrails**: Detects impersonation risks and verifies authority tiers (e.g., matching "Delivery Head" to company size).
 - **🖼️ Visual Assets**: Auto-fetches company logos via Google Favicons Service (`www.google.com/s2/favicons`).
+- **🔗 n8n Integration**: Built-in **Webhook Support** to trigger external workflows (e.g., email alerts, CRM sync) automatically upon lead analysis.
 
 ## 🛠️ Tech Stack
 

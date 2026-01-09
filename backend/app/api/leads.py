@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
@@ -7,6 +7,7 @@ from app.services.enrichment import enrichment_service
 from app.services.ai_scoring import ai_scoring_service
 from app.services.routing import routing_service
 from app.services.verification import verification_service
+from app.utils.webhook_client import send_webhook
 from app.db.database import get_session
 
 from sqlmodel import Session, select
@@ -62,7 +63,7 @@ async def get_leads(session: Session = Depends(get_session)):
 from app.models.settings import Settings
 
 @router.post("/analyze", response_model=AnalyzedLead)
-async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_session)):
+async def analyze_lead(lead_input: LeadInput, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     """
     Receives lead data, enriches it, scores it using AI, determines routing, and SAVES to DB.
     """
@@ -139,6 +140,11 @@ async def analyze_lead(lead_input: LeadInput, session: Session = Depends(get_ses
             routing_decision=routing_decision,
             verification_result=verification_result
         )
+
+        # 6. Trigger Outgoing Webhook (if configured)
+        if settings_db and settings_db.webhook_url:
+            # We send the full analyzed payload
+            background_tasks.add_task(send_webhook, settings_db.webhook_url, analyzed_lead)
         
         return analyzed_lead
     except HTTPException:
