@@ -26,15 +26,25 @@ This project is a functional MVP demonstrating **AI Readiness** in CRM workflows
 ### Backend
 
 - **Framework**: FastAPI (Python)
-- **AI Model**: Google Gemini 2.5 Flash
-- **Database**: PostgreSQL (via SQLModel)
-- **Tools**: Google Search Tool (for enrichment), Pydantic (for structured data)
+- **AI/LLM**: Google Generative AI (Gemini Pro) via `google-generativeai`
+- **Database**: PostgreSQL (via `sqlmodel` and `psycopg2-binary`)
+- **Validation**: Pydantic v2
+- **Server**: Uvicorn
+- **Key Modules**:
+  - `app/api`: REST Endpoints.
+  - `app/services`: Business logic for AI Scoring (`ai_scoring.py`), Routing (`routing.py`), and Enrichment.
+  - `app/models`: Pydantic data models.
 
 ### Frontend
 
-- **Framework**: Next.js 16 (React 19)
-- **Styling**: Tailwind CSS v4, Shadcn UI
-- **State Management**: Redux Toolkit
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **Styling**: TailwindCSS v4
+- **UI Components**: Shadcn/UI (based on Radix UI)
+- **State Management**: Redux Toolkit (and React Context)
+- **Icons**: Lucide React
+- **Charts**: Recharts
+- **HTTP Client**: Axios
 
 ## 🏁 Getting Started
 
