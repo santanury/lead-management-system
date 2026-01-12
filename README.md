@@ -99,7 +99,3 @@ The app will be available at `http://localhost:3000`.
 ## 🤝 Contribution
 
 This project is part of an internal AI Hackathon. Contributions to improve the scoring logic or add new integrations are welcome!
-
-## 📄 License
-
-MIT
