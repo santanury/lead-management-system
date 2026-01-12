@@ -26,7 +26,7 @@ async def get_settings(session: Session = Depends(get_session)):
     
     # Define available models here (or fetch from a config/service)
     models = [
-        {"id": "gemini-2.5-flash", "name": "Gemini 1.5 Flash (Fast & Cheap)"},
+        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash (New & Fast)"},
         {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro (Smart & Capable)"},
     ]
     
@@ -45,7 +45,7 @@ async def update_settings(settings: Settings, session: Session = Depends(get_ses
     
     settings_db.selected_model = settings.selected_model
     settings_db.auto_routing_enabled = settings.auto_routing_enabled
-    settings_db.enrichment_enabled = settings.enrichment_enabled
+    # enrichment_enabled removed from model
     
     session.add(settings_db)
     session.commit()

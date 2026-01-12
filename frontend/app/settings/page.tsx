@@ -27,7 +27,6 @@ const API_BASE_URL = "http://localhost:8000/api/v1";
 
 export default function SettingsPage() {
   const [autoRouting, setAutoRouting] = useState(true);
-  const [enrichment, setEnrichment] = useState(false);
   const [llm, setLlm] = useState("gemini-2.5-flash");
   const [availableModels, setAvailableModels] = useState<
     { id: string; name: string }[]
@@ -41,7 +40,7 @@ export default function SettingsPage() {
       .then((response) => {
         const data = response.data;
         setAutoRouting(data.auto_routing_enabled);
-        setEnrichment(data.enrichment_enabled);
+
         setLlm(data.selected_model);
         if (data.available_models) {
           setAvailableModels(data.available_models);
@@ -56,7 +55,6 @@ export default function SettingsPage() {
       await axios.put(`${API_BASE_URL}/settings`, {
         selected_model: llm,
         auto_routing_enabled: autoRouting,
-        enrichment_enabled: enrichment,
       });
       alert("Settings saved!");
     } catch (error) {
@@ -91,19 +89,7 @@ export default function SettingsPage() {
               onCheckedChange={setAutoRouting}
             />
           </div>
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="enrichment" className="flex flex-col space-y-1">
-              <span>External Enrichment</span>
-              <span className="font-normal leading-snug text-muted-foreground">
-                Use third-party services to enrich lead data.
-              </span>
-            </Label>
-            <Switch
-              id="enrichment"
-              checked={enrichment}
-              onCheckedChange={setEnrichment}
-            />
-          </div>
+
           <div className="flex items-center justify-between space-x-2">
             <Label htmlFor="llm-model" className="flex flex-col space-y-1">
               <span>AI Scoring Model</span>

@@ -70,17 +70,7 @@ async def analyze_lead(lead_input: LeadInput, background_tasks: BackgroundTasks,
     try:
         # 0. Check Settings
         settings_db = session.exec(select(Settings)).first()
-        enrichment_enabled = settings_db.enrichment_enabled if settings_db else True
-
-        # 1. Enrich lead data
-        if enrichment_enabled:
-            enrichment_data = enrichment_service.enrich_lead(lead_input.company_name, lead_input.email)
-        else:
-            # Create empty enrichment data if disabled
-            enrichment_data = EnrichmentData(
-                company_info=None,
-                email_valid=True # Assume valid if we skip verification to not block the flow
-            )
+        enrichment_data = enrichment_service.enrich_lead(lead_input.company_name, lead_input.email)
         
         if not enrichment_data.email_valid:
             raise HTTPException(status_code=400, detail="Invalid email address provided.")
@@ -142,7 +132,7 @@ async def analyze_lead(lead_input: LeadInput, background_tasks: BackgroundTasks,
         )
 
         # 6. Trigger Outgoing Webhook (if configured)
-        if settings_db and settings_db.webhook_url:
+        if settings_db and settings_db.webhook_url and settings_db.auto_routing_enabled:
             # We send the full analyzed payload
             background_tasks.add_task(send_webhook, settings_db.webhook_url, analyzed_lead)
         

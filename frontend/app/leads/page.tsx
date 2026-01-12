@@ -32,7 +32,7 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+
   const [scoreFilter, setScoreFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -76,11 +76,7 @@ export default function LeadsPage() {
         lead.email.toLowerCase().includes(search.toLowerCase()) ||
         lead.company_name.toLowerCase().includes(search.toLowerCase())
     )
-    .filter((lead) => {
-      // Status isn't explicitly in DB model yet aside from Queue, mapping Queue -> Status approximately
-      if (statusFilter === "all") return true;
-      return true; // Placeholder until status is unified
-    })
+
     .filter((lead) => {
       if (scoreFilter === "all") return true;
       const score = lead.score;
@@ -113,23 +109,7 @@ export default function LeadsPage() {
           }}
           className="max-w-sm"
         />
-        <Select
-          value={statusFilter}
-          onValueChange={(value) => {
-            setStatusFilter(value);
-            setCurrentPage(1);
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="qualified">Qualified</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
+
         <Select
           value={scoreFilter}
           onValueChange={(value) => {
