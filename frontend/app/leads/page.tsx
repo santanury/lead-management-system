@@ -166,12 +166,16 @@ export default function LeadsPage() {
                 <TableCell>{lead.score}</TableCell>
                 <TableCell>
                   <Badge
-                    variant={
-                      lead.category === "Hot"
-                        ? "default"
-                        : lead.category === "Cold"
-                        ? "destructive"
-                        : "outline"
+                    className={
+                      lead.category === "Exceptional"
+                        ? "bg-purple-600 hover:bg-purple-700"
+                        : lead.category === "High Confidence"
+                        ? "bg-green-600 hover:bg-green-700"
+                        : lead.category === "Strong"
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : lead.category === "Moderate"
+                        ? "bg-yellow-600 hover:bg-yellow-700"
+                        : "bg-gray-500 hover:bg-gray-600"
                     }
                   >
                     {lead.category}

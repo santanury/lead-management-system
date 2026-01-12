@@ -23,7 +23,17 @@ async def get_stats(session: Session = Depends(get_session)):
     """
     leads = session.exec(select(Lead)).all()
     total = len(leads)
-    qualified = len([l for l in leads if l.category == "Hot"])
+    # Define mapping from AI categories to Dashboard buckets
+    bucket_map = {
+        "Exceptional": "Hot",
+        "High Confidence": "Hot",
+        "Strong": "Warm",
+        "Moderate": "Warm",
+        "Low Confidence": "Cold"
+    }
+
+    # Calculate Qualified (Hot) leads based on mapping
+    qualified = len([l for l in leads if bucket_map.get(l.category, "Warm") == "Hot"])
     avg_score = sum([l.score for l in leads]) / total if total > 0 else 0
     
     # Real "New Leads Today" calculation
@@ -33,11 +43,9 @@ async def get_stats(session: Session = Depends(get_session)):
     # Chart data: Leads by Category
     categories = {"Hot": 0, "Warm": 0, "Cold": 0}
     for l in leads:
-        if l.category in categories:
-            categories[l.category] += 1
-        else:
-            # Handle standard "Warm" or others if logic changes
-            categories["Warm"] += 1
+        bucket = bucket_map.get(l.category, "Warm") # Default to Warm if unknown
+        if bucket in categories:
+            categories[bucket] += 1
 
     chart_data = [
         {"name": "Hot", "leads": categories["Hot"]},
