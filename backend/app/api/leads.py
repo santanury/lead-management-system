@@ -84,10 +84,10 @@ async def analyze_lead(lead_input: LeadInput, background_tasks: BackgroundTasks,
             raise HTTPException(status_code=400, detail="Invalid email address provided.")
 
         # 2. Verify Lead (Agentic Verification)
-        verification_result = verification_service.verify_lead(lead_input, enrichment_data)
+        verification_result = await verification_service.verify_lead(lead_input, enrichment_data)
 
         # 3. Score the lead using AI (now aware of verification)
-        bant_analysis, lead_score = ai_scoring_service.score_lead(lead_input, enrichment_data, verification_result)
+        bant_analysis, lead_score = await ai_scoring_service.score_lead(lead_input, enrichment_data, verification_result)
 
         # 4. Determine routing
         routing_decision = routing_service.route_lead(lead_score)

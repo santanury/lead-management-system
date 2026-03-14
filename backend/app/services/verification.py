@@ -1,129 +1,114 @@
 from app.models.lead import LeadInput, EnrichmentData, VerificationResult, LeadVerificationStatus, AuthorityTier
 from app.utils.gemini_client import gemini_client
+from app.config import settings
+import asyncio
 import json
 
 class VerificationService:
     """
     Service for verifying lead authenticity and authority using Gemini + Google Search.
+    Uses Micro-Agent architecture to separate Identity and Intent checks.
     """
 
-    def verify_lead(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> VerificationResult:
+    async def verify_lead(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> VerificationResult:
         """
-        Verifies the lead's identity, employment, and authority.
+        Verifies the lead's identity, employment, and intent concurrently.
         """
-        
-        # Build prompt for the Agentic Verification Engine
-        prompt = self._build_verification_prompt(lead_input, enrichment_data)
+        identity_prompt = self._build_identity_prompt(lead_input, enrichment_data)
+        intent_prompt = self._build_intent_prompt(lead_input, enrichment_data)
         
         try:
-            print(f"🕵️‍♂️ [VerificationService] Verifying: {lead_input.first_name} {lead_input.last_name} at {lead_input.company_name}")
+            print(f"🕵️‍♂️ [VerificationService] Micro-Agents Verifying: {lead_input.first_name} {lead_input.last_name}")
             
-            # Call Gemini with processing search enabled
-            # Note: We ask Gemini to do the searching and synthesis "internally" via tools if available, 
-            # or we rely on its training + the search tool we specifically enable.
-            verification_response = gemini_client.generate_json_response(prompt, use_search=True)
+            id_task = gemini_client.generate_json_response(identity_prompt, use_search=True, api_key=settings.google_api_key_identity)
+            intent_task = gemini_client.generate_json_response(intent_prompt, use_search=True, api_key=settings.google_api_key_intent)
             
-            # Map response to Pydantic model
-            status_str = verification_response.get("verification_status")
-            tier_str = verification_response.get("authority_tier")
+            results = await asyncio.gather(id_task, intent_task, return_exceptions=True)
+
+            for res in results:
+                if isinstance(res, Exception):
+                    print(f"❌ Verification agent failed: {res}")
+                    return self._get_fallback_verification()
+
+            id_data, intent_data = results
             
-            # Safe mapping for enums
-            status = self._map_status(status_str)
-            tier = self._map_tier(tier_str)
+            status = self._map_status(id_data.get("verification_status"))
+            tier = self._map_tier(id_data.get("authority_tier"))
             
-            raw_score = verification_response.get("verification_score", 0)
+            raw_score = id_data.get("verification_score", 0)
+            
+            # Add bonus points for intent
+            intent_signal = intent_data.get("intent_signal", "None")
+            if intent_signal == "Strong":
+                raw_score += 10
+                
             clamped_score = max(0, min(100, raw_score))
 
             return VerificationResult(
                 status=status,
                 score=clamped_score,
                 authority_tier=tier,
-                identity_verified=verification_response.get("identity_verified", False),
-                employment_verified=verification_response.get("employment_verified", False),
-                reason=verification_response.get("verification_reason", "No reason provided."),
-                intent_signal=verification_response.get("intent_signal", "None"),
-                intent_evidence=verification_response.get("intent_evidence", None)
+                identity_verified=id_data.get("identity_verified", False),
+                employment_verified=id_data.get("employment_verified", False),
+                reason=id_data.get("verification_reason", "No reason provided."),
+                intent_signal=intent_signal,
+                intent_evidence=intent_data.get("intent_evidence", None)
             )
 
         except Exception as e:
             print(f"❌ [VerificationService] Verification failed: {e}")
             return self._get_fallback_verification()
 
-    def _build_verification_prompt(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> str:
-        enrichment_summary = f"""
-        - Official Company Name: {enrichment_data.company_info.get('company_name', 'N/A') if enrichment_data.company_info else 'N/A'}
-        - Size: {enrichment_data.company_info.get('size', 'N/A') if enrichment_data.company_info else 'N/A'}
-        - Website: {enrichment_data.company_info.get('website', 'N/A') if enrichment_data.company_info else 'N/A'}
-        """
-        
+    def _build_identity_prompt(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> str:
+        enrichment_summary = f"- Official Company Name: {enrichment_data.company_info.get('company_name', 'N/A') if enrichment_data.company_info else 'N/A'} | Website: {enrichment_data.company_info.get('website', 'N/A') if enrichment_data.company_info else 'N/A'}"
         return f"""
-        You are an expert Lead Verification Agent. Your job is to validate whether a sales lead is REAL (authentic) and has the AUTHORITY they claim.
-        You have access to Google Search. Use it to verify the person's existence and current role.
+        You are an expert Lead Identity Verification Agent. Validate if a lead is REAL and has AUTHORITY. Use Google Search.
+        **Claim:** Name: {lead_input.first_name} {lead_input.last_name} | Email: {lead_input.email} | Claimed Company: {lead_input.company_name}
+        **Company Data:** {enrichment_summary}
 
-        **Lead Claims:**
-        - Name: {lead_input.first_name} {lead_input.last_name}
-        - Email: {lead_input.email}
-        - Stated Company: {lead_input.company_name}
-        - Note Context: "{lead_input.notes}"
-
-        **Known Company Data:**
-        {enrichment_summary}
-
-        **Investigation Tasks:**
-        1.  **Identity Check**: Does "{lead_input.first_name} {lead_input.last_name}" exist as a professional? Search for LinkedIn, official company bios, or news.
-        2.  **Employment Check**: Does this person CURRENTLY work at "{lead_input.company_name}" (or the Official Company Name)? 
-            - *Critical*: If they work at a DIFFERENT company now, flag as "Likely Fake" or "Unverified".
-        3.  **Role & Authority Check**: What is their actual job title? 
-            - Map it to a Tier: 
-                - Tier 1: C-Level, Founder, Partner, EVP.
-                - Tier 2: VP, Head of X, Director.
-                - Tier 3: Manager, Lead.
-                - Tier 4: Analyst, Associate, Engineer, Specialist.
-            - Does the role match the company size? (e.g., A "CEO" of a 1-person company is technically Tier 1 but low authority in practice, but sticking to title is fine for now).
-            - **Title Variations**: "Associate Delivery Head" vs "Delivery Head" is ACCEPTABLE. Close matches are OK. Only flag if completely different (e.g. "Intern" vs "VP").
-        4.  **Email Check**: 
-            - **Domain**: Does the email domain match the official website? ({enrichment_data.company_info.get('website', 'N/A') if enrichment_data.company_info else '?'})
-            - **IMPORTANT**: Allow Country Code TLDs! If website is `webskitters.com` and email is `@webskitters.in` (or .co.uk, .de), this is valid. MATCH THE ROOT DOMAIN.
-            - **Pattern Intelligence**: Search for "email format for {lead_input.company_name}" or guess based on typical corporate patterns (e.g., firstname.lastname@, firstinitial.lastname@). 
-            - Does `{lead_input.email}` look like a standard corporate email for this company?
-            - If email is @gmail/@yahoo but claiming to be an Executive at a Big Corp -> FLAG AS FAKE/PERSONAL.
-        5.  **Intent/Signal Validation (Context: "{lead_input.notes}")**:
-            - Is there any PUBLIC EVIDENDCE that {lead_input.company_name} is interested in the requested topic?
-            - Search for: "{lead_input.company_name} investment {lead_input.notes} news" or "{lead_input.company_name} digital transformation".
-            - Example: If they ask for "AI HR", did "Indus Net" announce any AI expansion?
-            - Determine: **Strong** (News found), **Weak** (Inferred/Logical), **None** (No evidence/Mismatch).
+        **Tasks:**
+        1. **Identity Check**: Does "{lead_input.first_name} {lead_input.last_name}" exist?
+        2. **Employment**: Do they CURRENTLY work at "{lead_input.company_name}"?
+        3. **Role Tier**: Tier 1 (C-Level/VP/Founder), Tier 2 (Director/Head), Tier 3 (Manager), Tier 4 (Contributor).
+        4. **Email Check**: Does `{lead_input.email}` domain match `{enrichment_data.company_info.get('website', 'N/A') if enrichment_data.company_info else '?'}` (allow country code TLDs)? Does the pattern look corporate? If public email (gmail) for a big corp, flag Fake.
 
         **Output Logic:**
-        - **Verified Decision Maker**: Identity confirmed + Employment confirmed + Tier 1 or 2. (Email Pattern Match is preferred but NOT required for small companies).
-        - **Verified Employee**: Identity confirmed + Employment confirmed + Tier 3 or 4.
-        - **Likely Fake**: 
-            - Claimed role contradicts public data (e.g. LinkedIn says they are a student or work elsewhere).
-            - Famous name (e.g. Satya Nadella) with non-corporate email.
-            - Non-existent person at a major company.
-            - **Email Pattern Mismatch**: Domain is correct but username part looks HIGHLY suspicious (e.g. `ceo.microsoft@outlook.com` or `satya123@microsoft.com`). If it's just a common variation (e.g. `ahmad.zafar` vs `zafar.ahmad`), DO NOT fail it.
-            - **NOTE**: `webskitters.in` vs `webskitters.com` is NOT a mismatch. It is a VALID variant.
-        - **Unverified**: Cannot find enough info to confirm or deny.
+        - "Verified Decision Maker" (Identity+Employment confirmed + Tier 1/2).
+        - "Verified Employee" (Identity+Employment confirmed + Tier 3/4).
+        - "Likely Fake" (Contradicts public data, fake email pattern, famous name misuse).
+        - "Unverified" (No info).
 
-        **Scoring (0-100):**
-        - Start at 0.
-        - +30 for Identity Verified.
-        - +30 for Employment Verified at this company.
-        - +20 for Corporate Domain Match (Include ccTLDs).
-        - +10 for Standard Email Pattern Match (Bonus).
-        - +10 for Tier 1 Role, +5 for Tier 2 Role.
-        - +10 Bonus for **Strong Intent Signal**.
-        - PENALTY: -100 if "Likely Fake".
+        **Scoring Base (0-90):** Start 0. +30 Identity, +30 Employment, +20 Domain Match, +10 Pattern Match. Penalty -100 if Fake.
 
-        **Return JSON:**
+        **Output Format (JSON):**
         {{
             "verification_status": "Verified Decision Maker" | "Verified Employee" | "Unverified" | "Likely Fake",
             "verification_score": <int>,
             "authority_tier": "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Unknown",
             "identity_verified": <bool>,
             "employment_verified": <bool>,
-            "verification_reason": "<Short explanation>",
+            "verification_reason": "Short explanation"
+        }}
+        """
+        
+    def _build_intent_prompt(self, lead_input: LeadInput, enrichment_data: EnrichmentData) -> str:
+        return f"""
+        You are an expert Intent Signal Verification Agent. Use Google Search to find public evidence of the lead's company needing the requested services.
+        **Company:** {lead_input.company_name} | **Inquiry Context:** "{lead_input.notes}"
+
+        **Task:**
+        - Is there ANY PUBLIC EVIDENCE that {lead_input.company_name} is interested in the topic mentioned in their notes?
+        - E.g., if they asked for cloud migration, did they recently announce a digital transformation initiative?
+        
+        Determine Signal Strength:
+        - **Strong**: Explicit news, job postings, or PR found related to the note.
+        - **Weak**: Inferred/Logical fit based on industry, but no explicit PR.
+        - **None**: No evidence or mismatch.
+
+        **Output Format (JSON):**
+        {{
             "intent_signal": "Strong" | "Weak" | "None",
-            "intent_evidence": "<Short evidence or link>"
+            "intent_evidence": "URL or short summary of evidence found (or null)"
         }}
         """
 
