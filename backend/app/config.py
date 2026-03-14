@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     google_api_key_identity: Optional[str] = None
     google_api_key_intent: Optional[str] = None
 
+    # n8n Webhook URL
+    n8n_webhook_url: Optional[str] = None
+
     class Config:
         env_file = ".env"
         env_prefix = "" # No prefix for environment variables

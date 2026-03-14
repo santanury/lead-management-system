@@ -9,6 +9,7 @@ from app.services.routing import routing_service
 from app.services.verification import verification_service
 from app.utils.webhook_client import send_webhook
 from app.db.database import get_session
+from app.services.n8n_service import n8n_service
 
 from sqlmodel import Session, select
 from typing import List
@@ -139,10 +140,12 @@ async def analyze_lead(lead_input: LeadInput, background_tasks: BackgroundTasks,
             verification_result=verification_result
         )
 
-        # 6. Trigger Outgoing Webhook (if configured)
+        # 6. Trigger Outgoing Webhook (if configured via legacy DB settings)
         if settings_db and settings_db.webhook_url and settings_db.auto_routing_enabled:
-            # We send the full analyzed payload
             background_tasks.add_task(send_webhook, settings_db.webhook_url, analyzed_lead)
+            
+        # 7. Trigger the new n8n Webhook asynchronously
+        background_tasks.add_task(n8n_service.trigger_webhook, lead_input, lead_score)
         
         return analyzed_lead
     except HTTPException:
