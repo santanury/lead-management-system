@@ -79,7 +79,7 @@ async def analyze_lead(lead_input: LeadInput, background_tasks: BackgroundTasks,
     try:
         # 0. Check Settings
         settings_db = session.exec(select(Settings)).first()
-        enrichment_data = enrichment_service.enrich_lead(lead_input.company_name, lead_input.email)
+        enrichment_data = await enrichment_service.enrich_lead(lead_input.company_name, lead_input.email)
         
         if not enrichment_data.email_valid:
             raise HTTPException(status_code=400, detail="Invalid email address provided.")
